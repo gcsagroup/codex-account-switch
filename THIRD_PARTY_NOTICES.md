@@ -1,32 +1,34 @@
-# 第三方软件说明
+# Third-party software notices
 
-Codex Account Switch 使用以下开源或第三方组件。版本来自当前 `Cargo.lock`；链接指向项目主页或源码仓库。
+[English](THIRD_PARTY_NOTICES.md) | [简体中文](THIRD_PARTY_NOTICES.zh-CN.md) | [繁體中文](THIRD_PARTY_NOTICES.zh-TW.md)
 
-## 必须在应用内显示的归属信息
+Codex Account Switch uses the open-source and third-party components listed below. Versions are taken from the current `Cargo.lock`. Links point to the relevant project or source repository.
+
+## Attribution shown inside the application
 
 ### Slint 1.17.1
 
-- 用途：原生桌面界面框架。
-- 项目与源码：[https://slint.dev](https://slint.dev)、[https://github.com/slint-ui/slint](https://github.com/slint-ui/slint)
-- 采用许可：`LicenseRef-Slint-Royalty-free-2.0`。
-- 要求：该许可要求在应用顶层可访问的“关于”界面显示 Slint 官方 `AboutSlint` 组件，或在公开下载页面显示 Slint 归属徽标。本应用采用前一种方式。
-- 许可原文：[Slint Royalty-free License 2.0](https://github.com/slint-ui/slint/blob/master/LICENSES/LicenseRef-Slint-Royalty-free-2.0.md)
+- Purpose: native desktop user-interface framework.
+- Project and source: [slint.dev](https://slint.dev), [github.com/slint-ui/slint](https://github.com/slint-ui/slint)
+- License used by this application: `LicenseRef-Slint-Royalty-free-2.0`.
+- Requirement: this license requires either the official Slint `AboutSlint` component in a top-level, accessible About screen or the Slint attribution badge on the public download page. This application uses the in-app `AboutSlint` component.
+- License text: [Slint Royalty-free License 2.0](https://github.com/slint-ui/slint/blob/master/LICENSES/LicenseRef-Slint-Royalty-free-2.0.md)
 
-## 随分发物保留的主要依赖信息
+## Main dependency notices retained with distributions
 
-| 组件 | 当前版本 | 用途 | 许可证 | 项目或源码 URL |
+| Component | Current version | Purpose | License | Project or source URL |
 | --- | --- | --- | --- | --- |
-| arboard | 3.6.1 | 剪贴板访问 | MIT OR Apache-2.0 | https://github.com/1Password/arboard |
-| base64 | 0.22.1 | 账号令牌解析 | MIT OR Apache-2.0 | https://github.com/marshallpierce/rust-base64 |
-| chrono | 0.4.45 | 时间与重置时间格式化 | MIT OR Apache-2.0 | https://github.com/chronotope/chrono |
-| fs4 | 0.13.1 | 文件锁 | MIT OR Apache-2.0 | https://github.com/al8n/fs4-rs |
-| reqwest | 0.12.28 | HTTPS 请求 | MIT OR Apache-2.0 | https://github.com/seanmonstar/reqwest |
-| rustls | 0.23.43 | TLS 实现 | Apache-2.0 OR ISC OR MIT | https://github.com/rustls/rustls |
-| rfd | 0.15.4 | 原生文件选择框 | MIT | https://github.com/PolyMeilex/rfd |
-| rusqlite | 0.40.2 | Claude Desktop SQLite 数据访问 | MIT | https://github.com/rusqlite/rusqlite |
-| libsqlite3-sys | 0.38.2 | 随应用编译的 SQLite 接口与源码 | MIT；SQLite 核心为 Public Domain | https://github.com/rusqlite/rusqlite |
-| serde / serde_json | 1.0.229 / 1.0.151 | 数据序列化 | MIT OR Apache-2.0 | https://serde.rs / https://github.com/serde-rs/json |
-| thiserror | 2.0.19 | 错误类型 | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror |
-| windows-sys | 0.61.2 | Windows 系统接口 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
+| arboard | 3.6.1 | Clipboard access | MIT OR Apache-2.0 | https://github.com/1Password/arboard |
+| base64 | 0.22.1 | Account token parsing | MIT OR Apache-2.0 | https://github.com/marshallpierce/rust-base64 |
+| chrono | 0.4.45 | Time and reset-time formatting | MIT OR Apache-2.0 | https://github.com/chronotope/chrono |
+| fs4 | 0.13.1 | File locking | MIT OR Apache-2.0 | https://github.com/al8n/fs4-rs |
+| reqwest | 0.12.28 | HTTPS requests | MIT OR Apache-2.0 | https://github.com/seanmonstar/reqwest |
+| rustls | 0.23.43 | TLS implementation | Apache-2.0 OR ISC OR MIT | https://github.com/rustls/rustls |
+| rfd | 0.15.4 | Native file picker | MIT | https://github.com/PolyMeilex/rfd |
+| rusqlite | 0.40.2 | Claude Desktop SQLite data access | MIT | https://github.com/rusqlite/rusqlite |
+| libsqlite3-sys | 0.38.2 | Bundled SQLite bindings and source | MIT; SQLite core is Public Domain | https://github.com/rusqlite/rusqlite |
+| serde / serde_json | 1.0.229 / 1.0.151 | Data serialization | MIT OR Apache-2.0 | https://serde.rs / https://github.com/serde-rs/json |
+| thiserror | 2.0.19 | Error types | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror |
+| windows-sys | 0.61.2 | Windows system APIs | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 
-Cargo 会为不同平台解析额外的传递依赖。精确版本以项目的 `Cargo.lock` 为准，各组件的完整许可原文以其源码包内 `LICENSE`、`LICENSE-*`、`COPYING` 或 `NOTICE` 文件为准。本文件用于归属与来源说明，不改变任何第三方许可条款。
+Cargo resolves additional transitive dependencies for different platforms. Refer to `Cargo.lock` for the exact resolved versions and to each source package's `LICENSE`, `LICENSE-*`, `COPYING`, or `NOTICE` files for the full license text. This document records attribution and provenance; it does not modify any third-party license terms.

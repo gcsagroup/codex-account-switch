@@ -1,15 +1,21 @@
-# 构建与发布说明
+# Build and release guide
 
-## 工具链
+[English](RELEASE.md) | [简体中文](RELEASE.zh-CN.md) | [繁體中文](RELEASE.zh-TW.md)
 
-- Rust：固定 `1.97.1`。
-- 最低 Rust：`1.92`，由 `Cargo.toml` 声明。
-- UI：Slint `1.17`。
-- CI：macOS 14 与 Windows 2025。
+This guide describes the build scripts and release gates that exist in the current source tree. A successful local or CI build is not, by itself, a signed and supported public release.
 
-Homebrew Rust 1.91.1 与当前 Slint 不兼容。构建时应使用仓库的 `rust-toolchain.toml` 或明确调用 Rust 1.97.1。
+## Toolchain
 
-## 发布前检查
+- Pinned Rust toolchain: `1.97.1` (`rust-toolchain.toml`)
+- Minimum Rust version: `1.92` (`Cargo.toml`)
+- UI framework: Slint `1.17`
+- CI runners: `macos-14` and `windows-2025`
+
+Use the repository toolchain rather than an older system Rust installation.
+
+## Quality checks
+
+Run these checks before packaging:
 
 ```bash
 cargo fmt --all -- --check
@@ -18,32 +24,36 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-当前基线为 32 项测试。变更测试数量后，应同步更新 README、CHANGELOG 和审查报告。
+The current source baseline contains 32 tests. If that number changes, update the status statements in the README and changelog.
 
 ## macOS
 
-### 打包
+### Package and run locally
 
 ```bash
 ./scripts/package-macos.sh
 ./scripts/run-macos.sh
 ```
 
-输出：
+Output:
 
 ```text
 dist/Codex Account Switch.app
 ```
 
-App 的 `Contents/Resources` 同时包含项目 `LICENSE` 和 `THIRD_PARTY_NOTICES.md`。
+The package script:
 
-当前脚本生成 arm64 本地 App，最低系统版本为 macOS 13。`package-macos.sh` 只打包，不签名。
+- builds with Rust `1.97.1` and `Cargo.lock`;
+- respects an externally supplied `CARGO_TARGET_DIR`;
+- sets macOS 13 as the minimum system version;
+- includes `LICENSE` and the English `THIRD_PARTY_NOTICES.md` in `Contents/Resources`;
+- creates an unsigned package for local validation.
 
-脚本尊重外部 `CARGO_TARGET_DIR`；未设置时仍使用仓库内的 `target/`。
+The current script builds for the host architecture. The existing local validation baseline is Apple silicon (`arm64`).
 
-### 签名与公证
+### Sign and notarize
 
-先在 Keychain 中配置 Developer ID 和 `notarytool` profile：
+Configure a Developer ID identity and a `notarytool` keychain profile, then run:
 
 ```bash
 export APPLE_SIGN_IDENTITY='Developer ID Application: ...'
@@ -51,43 +61,41 @@ export APPLE_NOTARY_PROFILE='codex-account-switch-notary'
 ./scripts/sign-notarize-macos.sh
 ```
 
-脚本会执行 hardened runtime 签名、严格验证、公证、staple 和 Gatekeeper 检查。任何一步失败都不能发布。
+The script performs hardened-runtime signing, strict signature verification, notarization, stapling, and Gatekeeper assessment. Every step must pass before external distribution.
 
 ## Windows
 
-### macOS 交叉构建依赖
+### Cross-build prerequisites on macOS
 
 ```bash
 brew install mingw-w64 lld
 cargo install cargo-xwin --locked
 ```
 
-### 构建
+### Build
 
 ```bash
-./scripts/build-windows.sh
+./scripts/build-windows.sh       # x64 and x86
 ./scripts/build-windows.sh x64
 ./scripts/build-windows.sh x86
 ```
 
-Windows 脚本同样尊重外部 `CARGO_TARGET_DIR`。
+The script respects an externally supplied `CARGO_TARGET_DIR` and uses these targets:
 
-目标映射：
+- x64: `x86_64-pc-windows-gnu`
+- x86: `i686-pc-windows-msvc`, built with `cargo-xwin` and a statically linked CRT
 
-- x64：`x86_64-pc-windows-gnu`
-- x86：`i686-pc-windows-msvc`，通过 `cargo-xwin` 构建并静态链接 CRT
+The x86 linker can emit `LNK4099` warnings for missing PDB files in Microsoft static libraries. If the release build succeeds, the PE architecture is correct, and the executable does not dynamically import `VCRUNTIME` or `MSVCP`, that warning is not a runtime dependency failure.
 
-x86 链接时可能出现微软静态库缺少 PDB 的 `LNK4099` 警告。Release 构建成功、PE 架构正确且没有动态 VC Runtime 导入时，该警告不影响可执行文件运行。
+### Outputs
 
-### 输出文件
+- `dist/windows/codex-account-switch-windows-x86_64.exe`: x64 release executable
+- `dist/windows/codex-account-switch-windows-x86.exe`: x86 release executable
+- `dist/windows/codex-account-switch.exe`: compatibility copy of the x64 executable
+- `*.sha256`: checksum files for the architecture-specific executables
+- `LICENSE` and `THIRD_PARTY_NOTICES.md`: files that must accompany redistribution
 
-- `dist/windows/codex-account-switch-windows-x86_64.exe`：64 位正式文件。
-- `dist/windows/codex-account-switch-windows-x86.exe`：32 位正式文件。
-- `dist/windows/codex-account-switch.exe`：x64 兼容别名，与 x64 文件哈希相同。
-- `*.sha256`：两个架构正式文件的校验值。
-- `LICENSE`、`THIRD_PARTY_NOTICES.md`：项目许可证与第三方归属、许可及源码 URL，发布时必须与可执行文件一同提供。
-
-### 静态校验
+### Static verification
 
 ```bash
 file dist/windows/*.exe
@@ -97,19 +105,20 @@ shasum -a 256 -c codex-account-switch-windows-x86_64.exe.sha256
 shasum -a 256 -c codex-account-switch-windows-x86.exe.sha256
 ```
 
-静态校验不能替代 Windows 真机验收。发布前必须在 x64 和 x86 环境验证启动、Codex 导入/切换、Claude SQLite、重启、托盘和退出。
+Static verification does not replace real Windows testing. Before public release, test both supported architectures on Windows, including launch, Codex import and switching, Claude Desktop switching, restart actions, tray behavior, and explicit exit.
 
-## 版本与变更记录
+## Release flow
 
-1. 更新 `Cargo.toml` 版本并刷新 `Cargo.lock`。
-2. 将 `CHANGELOG.md` 对应版本从“未发布”改为发布日期。
-3. 确保 README、SECURITY、审查报告和产物名称一致。
-4. 创建可信提交和发布标签。
-5. 从该标签重新构建、签名并生成 SHA-256。
-6. 发布说明中明确平台、架构、签名状态和已知限制。
+1. Update the version in `Cargo.toml` and refresh `Cargo.lock`.
+2. Replace `Unreleased` in all three changelogs with the release date.
+3. Re-run the quality checks and platform packaging checks.
+4. Create the release commit and tag.
+5. Rebuild from that tag, then sign, notarize where applicable, and generate checksums.
+6. Publish matching binaries, license files, third-party notices, and release notes.
+7. State the platform, architecture, signing status, and known limitations in the GitHub Release.
 
-## 当前发布阻断项
+## Current public-release blockers
 
-- macOS 尚未完成 Developer ID 签名与公证。
-- Windows 尚未完成代码签名和 x64/x86 真机验收。
-- 当前仓库尚未建立正式 Release 和可追溯的发布提交基线。
+- The macOS package has not yet passed Developer ID signing and Apple notarization.
+- Windows executables have not yet passed code signing or real x64/x86 machine smoke tests.
+- No formal GitHub Release has been published for version `0.1.0`.

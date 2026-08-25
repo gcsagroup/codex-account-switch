@@ -1,82 +1,85 @@
-# 架构与数据流
+# Architecture and Data Flow
 
-## 总览
+[English](ARCHITECTURE.md) | [简体中文](ARCHITECTURE.zh-CN.md) | [繁體中文](ARCHITECTURE.zh-TW.md)
 
-Codex Account Switch 是单进程原生桌面应用。Slint 负责窗口和系统托盘，Rust 负责本地凭据、SQLite、网络查询、切换事务与后台刷新。应用没有自有服务端。
+## Overview
+
+Codex Account Switch is a single-process native desktop application. Slint owns the window and system tray; Rust owns local credentials, SQLite operations, network queries, switching transactions, and background refresh. There is no project-operated backend.
 
 ```text
-Slint 窗口 / 系统托盘
-          │
-          ▼
-      src/main.rs
-       │      │
-       │      ├── Codex Profile / Switcher / Login / Usage
-       │      └── Claude Profile / SQLite Switcher
-       ▼
-本地文件、ChatGPT 接口、Codex/Claude 桌面进程
+Slint window / system tray
+            |
+            v
+        src/main.rs
+         |       |
+         |       +-- Codex profile / switcher / login / usage
+         +---------- Claude profile / SQLite switcher
+            |
+            v
+Local files, ChatGPT endpoints, Codex/Claude desktop processes
 ```
 
-## 模块职责
+## Modules
 
-- `ui/app.slint`：窗口、托盘、语言菜单、导入面板、账号列表、额度与活动洞察视图。
-- `src/main.rs`：应用生命周期、UI 回调、共享状态、后台刷新、退出路径和模块编排。
-- `src/identity.rs`：解析 `auth.json`、OAuth/JWT claims、API Key 和账号身份比较。
-- `src/profile.rs`：Codex Profile 存储、别名校验、原子写入、权限、回收与恢复。
-- `src/switcher.rs`：Codex 保存当前、接管外部登录、切换、token 写回、快照和回滚事务。
-- `src/login.rs`：启动和取消 `codex login`，检测 live `auth.json` 变化及登录超时。
-- `src/usage.rs`：额度与 Token 活动请求、窗口归类、重置时间、缓存和格式化。
-- `src/claude.rs`：Claude Cookies Profile、SQLite 一致性备份、切换、重启、回收与恢复。
-- `src/restart.rs`：macOS/Windows 上退出并重新启动 ChatGPT/Codex 桌面端。
-- `src/paths.rs`：平台 live 路径、`CODEX_HOME` 与 `CODEX_SWITCH_HOME`。
-- `src/i18n.rs`：七种语言、系统语言检测和翻译完整性测试。
+- `ui/app.slint`: window, tray, language menu, imports, account cards, usage, and activity insights.
+- `src/main.rs`: lifecycle, UI callbacks, shared state, background refresh, preview state, and coordinated exit.
+- `src/identity.rs`: `auth.json`, OAuth/JWT claims, API-key parsing, and identity comparison.
+- `src/profile.rs`: Codex profile storage, alias validation, atomic writes, permissions, trash, and recovery.
+- `src/switcher.rs`: save/adopt/switch flows, token write-back, snapshots, and rollback.
+- `src/login.rs`: start/cancel `codex login`, detect live-file changes, and enforce login timeout.
+- `src/usage.rs`: usage/activity requests, window classification, reset times, cache, and formatting.
+- `src/claude.rs`: Claude Cookies profiles, SQLite backup/validation, switching, restart, trash, and recovery.
+- `src/restart.rs`: stop and relaunch ChatGPT/Codex desktop applications on macOS and Windows.
+- `src/paths.rs`: platform live paths plus `CODEX_HOME` and `CODEX_SWITCH_HOME`.
+- `src/i18n.rs`: seven UI languages, system-language detection, and translation coverage.
 
-## Codex 导入流程
+## Codex import
 
-1. 来源可以是 `codex login`、当前 live 文件、用户选择的文件、文本或剪贴板。
-2. 限制输入大小，清理可选 Markdown JSON 代码块并解析凭据。
-3. 提取邮箱、plan 和 account ID；生成或校验别名。
-4. 以私有权限原子写入 `profiles/<alias>/auth.json`。
-5. 外部登录采用 adopt-live 流程，同步 current 标记但不覆盖旧账号。
+1. Read from `codex login`, the live file, a selected file/directory, text, or clipboard.
+2. Enforce the size limit, remove an optional Markdown JSON fence, and parse credentials.
+3. Extract identity metadata and generate or validate the alias.
+4. Atomically write `profiles/<alias>/auth.json` with private permissions.
+5. Browser/external login adopts the live identity and updates the current marker without overwriting another account.
 
-## Codex 切换事务
+## Codex switch transaction
 
-1. 获取 `auth.lock` 独占锁并重新验证目标 Profile。
-2. 读取 live `auth.json`，在 `recovery/codex/` 创建恢复快照。
-3. 如果 live 与 current 属于同一账号，将刷新后的 token 写回当前 Profile。
-4. 如果身份不一致，停止切换，避免把外部账号覆盖到旧 Profile。
-5. 原子替换 live `auth.json`，再更新 current 标记。
-6. current 更新失败时恢复切换前 live 文件。
-7. 用户选择“重启”时，等待 ChatGPT/Codex 退出后重新启动。
+1. Acquire `auth.lock` and revalidate the target profile.
+2. Read the live file and create a snapshot under `recovery/codex/`.
+3. If live and current identities match, write refreshed tokens back to the current profile.
+4. Reject an identity mismatch instead of overwriting the saved current profile.
+5. Atomically replace live `auth.json`, then update the current marker.
+6. Restore the previous live file if the current-marker update fails.
+7. Relaunch the relevant desktop process only when the user selected Restart.
 
-## Claude 切换事务
+## Claude switch transaction
 
-1. 获取 `cookies.lock` 并验证目标 SQLite Profile。
-2. 请求 Claude Desktop 退出。
-3. 使用 SQLite Backup API 为 live Cookies 创建一致恢复快照。
-4. 清理可能冲突的 sidecar，原子替换 live Cookies。
-5. 更新 current 标记并重新启动 Claude Desktop。
-6. 替换失败时恢复原数据库；删除操作只移动到私有回收区。
+1. Acquire `cookies.lock` and validate the target SQLite profile.
+2. Stop Claude Desktop.
+3. Use the SQLite Backup API to snapshot active Cookies.
+4. Handle sidecars and replace live Cookies.
+5. Update the current marker and relaunch Claude Desktop.
+6. Restore the prior database on replacement failure; deletions move to private trash.
 
-## 额度刷新
+## Usage and activity refresh
 
-- `wham/usage` 提供 plan、credits 和限额窗口。
-- `wham/profiles/me` 提供累计/峰值 Token、连续天数、最长会话、每日/每周/累计 bucket、推理强度、技能/聊天统计和常用插件/技能。
-- API primary/secondary 按 `limit_window_seconds` 归类为短窗口或每周窗口。
-- `reset_after_seconds` 会根据获取时间换算为本地绝对重置时间。
-- 结果原子写入 `cache/usage.json`；错误保存在内存/UI 状态，不包含 token。额度请求成功但活动请求临时失败时保留上次成功的活动快照。
-- UI 将每日 bucket 补齐为 52×7 热力图；每周和累计 bucket 分别形成 52 点趋势，累计值按可见区间起点归一化。
-- single-flight 防止重复刷新；后台线程每分钟刷新当前账号，并周期性刷新全部账号。
+- `wham/usage` supplies plan, credits, and limit windows.
+- `wham/profiles/me` supplies token totals, streaks, session duration, daily/weekly/cumulative buckets, reasoning, skills, chats, and plugin/skill rankings.
+- Window duration classifies short and weekly limits; relative reset values become local absolute times.
+- Results are atomically cached in `cache/usage.json`; errors stay in memory/UI and do not contain tokens.
+- A successful usage request does not erase the last activity snapshot when the activity request fails.
+- The UI fills the daily series to a 52-by-7 heatmap and derives weekly/cumulative trend points.
+- Single-flight refresh prevents duplicate work. The active account refreshes every minute; all accounts refresh periodically and on demand.
 
-## 并发与生命周期
+## Concurrency and lifecycle
 
-- `instance.lock` 防止多实例同时运行。
-- UI 状态由 `Arc<Mutex<AppShared>>` 保护；后台结果通过 Slint 事件循环回到 UI。
-- 应用退出会停止刷新循环、取消浏览器登录、隐藏托盘和窗口，然后结束事件循环。
-- 标题栏关闭、界面退出和托盘退出使用同一退出函数。
+- `instance.lock` prevents concurrent application instances.
+- `Arc<Mutex<AppShared>>` protects shared state; background results return through the Slint event loop.
+- Clicking a card changes only the preview alias. Switching credentials requires an explicit Switch or Restart action.
+- Close, in-app Quit, and tray Quit share one shutdown path that stops refresh/login work and exits the event loop.
 
-## 信任边界
+## Trust boundaries
 
-- 本地文件系统和当前 OS 用户是主要信任边界。
-- ChatGPT/Claude、OAuth/JWT 和桌面客户端行为均属于第三方依赖。
-- 应用只做本地结构与一致性检查，不验证服务端签名或 token 撤销状态。
-- 未签名的构建产物不提供发布者身份保证。
+- The local filesystem and current OS user are the primary trust boundary.
+- ChatGPT/Claude services, OAuth/JWT content, and desktop-client behavior are third-party dependencies.
+- The application validates local structure and consistency but does not verify server signatures or revocation.
+- Unsigned artifacts do not provide publisher identity.
