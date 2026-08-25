@@ -1,0 +1,1946 @@
+import { AboutSlint, ScrollView, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+export struct AccountRow {
+    alias: string,
+    email: string,
+    plan: string,
+    account_id: string,
+    is_current: bool,
+    is_valid: bool,
+    primary_pct: float,
+    secondary_pct: float,
+    primary_reset: string,
+    secondary_reset: string,
+    primary_available: bool,
+    secondary_available: bool,
+    credits: string,
+    usage_summary: string,
+    usage_updated: string,
+    usage_attention: bool,
+    usage_error: string,
+}
+
+export struct ActivityInvocation {
+    name: string,
+    kind: string,
+    count: string,
+}
+
+// Dark control-room palette: quiet surfaces, warm focus, restrained borders.
+global Theme {
+    out property <color> bg: #0F141B;
+    out property <color> panel: #151D27;
+    out property <color> elevated: #1D2835;
+    out property <color> surface: #222F3E;
+    out property <color> line: #2B3949;
+    out property <color> text: #F0F4F8;
+    out property <color> muted: #93A1B3;
+    out property <color> faint: #607084;
+    out property <color> copper: #E2A344;
+    out property <color> copper-dim: #B98234;
+    out property <color> danger: #F06B55;
+    out property <color> ok: #72C1A8;
+}
+
+export component AppTray inherits SystemTrayIcon {
+    in-out property <string> tray-tooltip <=> root.tooltip;
+    in-out property <string> tray-title <=> root.title;
+    in-out property <bool> tray-visible <=> root.visible;
+    in property <[AccountRow]> accounts: [];
+
+    icon: @image-url("../assets/tray-icon.png");
+    tooltip: "Codex Account Switch";
+    title: "Codex";
+
+    in-out property <string> tr-tray-refresh: "Refresh Usage";
+    in-out property <string> tr-tray-switch: "Switch Account";
+    in-out property <string> tr-tray-show: "Show Window";
+    in-out property <string> tr-tray-quit: "Quit";
+
+    callback refresh-usage();
+    callback switch-account(string);
+    callback show-window();
+    callback quit();
+
+    Menu {
+        MenuItem {
+            title: tr-tray-show;
+            activated => { show-window(); }
+        }
+        MenuSeparator {}
+        MenuItem {
+            title: tr-tray-refresh;
+            activated => { refresh-usage(); }
+        }
+        MenuSeparator {}
+        Menu {
+            title: tr-tray-switch;
+            for acc in root.accounts: MenuItem {
+                title: (acc.is_current ? "✓ " : "   ") + acc.alias + (acc.plan == "" ? "" : " · " + acc.plan);
+                enabled: acc.is_valid && !acc.is_current;
+                activated => { switch-account(acc.alias); }
+            }
+        }
+        MenuSeparator {}
+        MenuItem {
+            title: tr-tray-quit;
+            activated => { quit(); }
+        }
+    }
+}
+
+component Gauge inherits Rectangle {
+    in property <string> label;
+    in property <float> percent;
+    in property <string> reset-text;
+    in property <bool> available: true;
+    height: 68px;
+    border-radius: 9px;
+    background: Theme.bg.with-alpha(0.52);
+    border-width: 1px;
+    border-color: Theme.line.with-alpha(0.72);
+
+    VerticalBox {
+        padding-left: 11px;
+        padding-right: 11px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        spacing: 5px;
+
+        HorizontalBox {
+            Text {
+                text: label;
+                font-size: 10px;
+                font-family: "Menlo";
+                color: Theme.muted;
+                letter-spacing: 0.8px;
+                horizontal-stretch: 1;
+            }
+            Text {
+                text: available ? Math.round(percent) + "%" : "—";
+                font-size: 12px;
+                font-weight: 700;
+                font-family: "Menlo";
+                color: !available ? Theme.faint : (percent >= 90 ? Theme.danger : Theme.copper);
+            }
+        }
+
+        Rectangle {
+            height: 5px;
+            border-radius: 3px;
+            background: Theme.line;
+            Rectangle {
+                x: 0px;
+                width: root.available ? parent.width * Math.min(1.0, Math.max(0.0, root.percent / 100)) : 0px;
+                height: parent.height;
+                border-radius: 3px;
+                background: root.percent >= 90 ? Theme.danger : (root.percent >= 70 ? Theme.copper-dim : Theme.copper);
+            }
+        }
+
+        Text {
+            text: reset-text;
+            font-size: 9px;
+            font-family: "Menlo";
+            color: Theme.faint;
+            overflow: elide;
+        }
+    }
+}
+
+component PlanBadge inherits Rectangle {
+    in property <string> label;
+
+    height: 20px;
+    min-width: max(48px, badge-layout.min-width);
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    border-radius: 10px;
+    background: Theme.copper.with-alpha(0.14);
+    border-width: 1px;
+    border-color: Theme.copper.with-alpha(0.22);
+
+    badge-layout := HorizontalLayout {
+        padding-left: 9px;
+        padding-right: 9px;
+        padding-top: 2px;
+        padding-bottom: 2px;
+        alignment: center;
+
+        Text {
+            text: label;
+            font-size: 10px;
+            font-family: "Menlo";
+            font-weight: 700;
+            color: Theme.copper;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
+component ActivityMetric inherits Rectangle {
+    in property <string> value;
+    in property <string> label;
+
+    height: 72px;
+    horizontal-stretch: 1;
+    border-radius: 10px;
+    background: Theme.elevated.with-alpha(0.58);
+    border-width: 1px;
+    border-color: Theme.line.with-alpha(0.72);
+
+    VerticalBox {
+        padding: 10px;
+        spacing: 3px;
+        alignment: center;
+        Text {
+            text: value == "" ? "—" : value;
+            font-size: 16px;
+            font-weight: 700;
+            color: Theme.text;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+        Text {
+            text: label;
+            font-size: 9px;
+            font-family: "Menlo";
+            color: Theme.muted;
+            horizontal-alignment: center;
+            overflow: elide;
+        }
+    }
+}
+
+component GhostButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> emphasis: false;
+    in property <bool> danger: false;
+    in property <bool> solid: false; // stronger filled secondary action
+    in property <length> btn-height: 32px;
+    in-out property <bool> enabled <=> touch.enabled;
+    callback clicked();
+
+    forward-focus: key-focus;
+    accessible-role: button;
+    accessible-enabled: enabled;
+    accessible-label: label;
+    accessible-action-default => { root.clicked(); }
+
+    private property <bool> hot: enabled && (touch.has-hover || touch.pressed);
+    private property <bool> down: enabled && touch.pressed;
+
+    height: btn-height;
+    min-width: max(72px, button-layout.min-width);
+    horizontal-stretch: 0;
+    vertical-stretch: 0;
+    border-radius: 7px;
+    background: !enabled ? Theme.elevated.with-alpha(0.35)
+        : down ? (emphasis || solid ? Theme.copper-dim : Theme.copper.with-alpha(0.35))
+        : emphasis ? Theme.copper
+        : danger ? Theme.danger.with-alpha(hot ? 0.14 : 0.07)
+        : solid ? Theme.elevated.with-alpha(0.82)
+        : hot ? Theme.copper.with-alpha(0.18)
+        : transparent;
+    border-width: (emphasis && !down) ? 0px : 1px;
+    border-color: !enabled ? Theme.line
+        : down ? Theme.copper
+        : danger ? Theme.danger.with-alpha(hot ? 0.58 : 0.18)
+        : hot ? Theme.copper.with-alpha(0.65)
+        : Theme.line;
+
+    button-layout := HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-top: 4px;
+        padding-bottom: 4px;
+        alignment: center;
+        Text {
+            text: label;
+            font-size: 12px;
+            font-weight: 700;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            accessible-role: none;
+            color: !enabled ? Theme.faint
+                : emphasis ? #1A140C
+                : danger && !hot ? Theme.danger
+                : down || hot ? Theme.copper
+                : Theme.text;
+        }
+    }
+
+    key-focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if (event.text == " " || event.text == "\n") {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: enabled ? pointer : default;
+        clicked => { root.clicked(); }
+    }
+}
+
+component UsageChip inherits Rectangle {
+    in property <string> label;
+    in property <float> percent;
+    in property <string> reset-text;
+    in property <string> reset-label;
+    in property <bool> attention: false;
+
+    height: 38px;
+    horizontal-stretch: 1;
+    vertical-stretch: 0;
+    border-radius: 9px;
+    background: attention ? Theme.danger.with-alpha(0.10) : Theme.bg.with-alpha(0.68);
+    border-width: 1px;
+    border-color: attention ? Theme.danger.with-alpha(0.42) : Theme.line.with-alpha(0.82);
+
+    Text {
+        x: 14px;
+        y: 0px;
+        width: parent.width - 214px;
+        height: parent.height;
+        text: reset-label + " " + reset-text;
+        font-size: 11px;
+        font-family: "Menlo";
+        font-weight: 700;
+        color: attention ? Theme.danger : Theme.muted;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    Text {
+        x: parent.width - 186px;
+        y: 0px;
+        width: 100px;
+        height: parent.height;
+        text: label;
+        font-size: 11px;
+        font-weight: 700;
+        color: attention ? Theme.danger : Theme.muted;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    Text {
+        x: parent.width - 78px;
+        y: 0px;
+        width: 64px;
+        height: parent.height;
+        text: Math.round(percent) + "%";
+        font-size: 16px;
+        font-weight: 700;
+        font-family: "Menlo";
+        color: attention ? Theme.danger : Theme.text;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+}
+
+component LanguageOption inherits Rectangle {
+    in property <string> label;
+    in property <bool> selected: false;
+    callback clicked();
+
+    height: 28px;
+    border-radius: 5px;
+    background: selected ? Theme.copper.with-alpha(0.18) : (option-touch.has-hover ? Theme.panel : transparent);
+
+    option-touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: label;
+        font-size: 11px;
+        font-family: "Menlo";
+        color: selected ? Theme.copper : Theme.text;
+        vertical-alignment: center;
+        x: 10px;
+    }
+}
+
+component Field inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder;
+    callback accepted();
+
+    height: 36px;
+    border-radius: 6px;
+    background: Theme.bg;
+    border-width: 1px;
+    border-color: edit.has-focus ? Theme.copper.with-alpha(0.65) : Theme.line;
+
+    if text == "": Text {
+        x: 12px;
+        y: 10px;
+        text: placeholder;
+        font-size: 12px;
+        font-family: "Menlo";
+        color: Theme.faint;
+    }
+
+    edit := TextInput {
+        x: 12px;
+        width: parent.width - 24px;
+        height: 100%;
+        text <=> root.text;
+        font-size: 12px;
+        font-family: "Menlo";
+        color: Theme.text;
+        selection-background-color: Theme.copper.with-alpha(0.35);
+        selection-foreground-color: Theme.text;
+        single-line: true;
+        vertical-alignment: center;
+        accepted => { root.accepted(); }
+    }
+}
+
+component TextArea inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder;
+    in property <length> area-height: 96px;
+
+    height: area-height;
+    border-radius: 6px;
+    background: Theme.bg;
+    border-width: 1px;
+    border-color: edit.has-focus ? Theme.copper.with-alpha(0.65) : Theme.line;
+
+    if text == "": Text {
+        x: 12px;
+        y: 10px;
+        text: placeholder;
+        font-size: 11px;
+        font-family: "Menlo";
+        color: Theme.faint;
+        wrap: word-wrap;
+        width: parent.width - 24px;
+    }
+
+    edit := TextInput {
+        x: 8px;
+        y: 6px;
+        width: parent.width - 16px;
+        height: parent.height - 12px;
+        text <=> root.text;
+        font-size: 11px;
+        font-family: "Menlo";
+        color: Theme.text;
+        selection-background-color: Theme.copper.with-alpha(0.35);
+        selection-foreground-color: Theme.text;
+        single-line: false;
+        wrap: word-wrap;
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "Codex Account Switch";
+    preferred-width: 860px;
+    preferred-height: 720px;
+    min-width: 780px;
+    min-height: 480px;
+    background: Theme.bg;
+
+    in-out property <[AccountRow]> accounts: [];
+    in-out property <string> status-text: "Ready";
+    in-out property <string> active-alias: "";
+    in-out property <string> current-alias: "";
+    in-out property <string> current-email: "";
+    in-out property <string> current-plan: "";
+    in-out property <float> current-primary: 0;
+    in-out property <float> current-secondary: 0;
+    in-out property <string> current-primary-reset: "—";
+    in-out property <string> current-secondary-reset: "—";
+    in-out property <string> current-credits: "";
+    in-out property <string> current-token-lifetime: "";
+    in-out property <string> current-token-peak: "";
+    in-out property <string> current-token-streak: "";
+    in-out property <string> current-token-longest: "";
+    in-out property <[float]> current-token-trend: [];
+    in-out property <string> current-token-week: "";
+    in-out property <string> current-token-longest-streak: "";
+    in-out property <[float]> current-token-daily: [];
+    in-out property <[float]> current-token-weekly: [];
+    in-out property <[float]> current-token-cumulative: [];
+    in-out property <string> current-fast-mode: "";
+    in-out property <string> current-reasoning: "";
+    in-out property <string> current-unique-skills: "";
+    in-out property <string> current-total-skills: "";
+    in-out property <string> current-total-threads: "";
+    in-out property <[ActivityInvocation]> current-top-invocations: [];
+    in-out property <bool> current-primary-available: false;
+    in-out property <bool> current-secondary-available: false;
+    in-out property <string> save-alias: "";
+    in-out property <string> browse-path: "";
+    in-out property <string> paste-json: "";
+    in-out property <string> paste-alias: "";
+    in-out property <string> rename-from: "";
+    in-out property <string> rename-to: "";
+    in-out property <string> login-alias: "";
+    in-out property <bool> login-running: false;
+    in-out property <int> lang-index: 1;
+    in-out property <int> provider-index: 0;
+    in-out property <bool> can-restore: false;
+    private property <bool> show-about: false;
+    private property <bool> show-activity: false;
+    private property <int> activity-range: 0;
+
+    callback set-language(int);
+    callback set-provider(int);
+
+    // i18n text properties
+    in-out property <string> tr-app-title: "Codex Account Switch";
+    in-out property <string> tr-tray-refresh: "Refresh Usage";
+    in-out property <string> tr-tray-switch: "Switch Account";
+    in-out property <string> tr-tray-quit: "Quit";
+    in-out property <string> tr-btn-about: "About";
+    in-out property <string> tr-about-description: "A local GCSA utility for saving and switching Codex and Claude Desktop account profiles, viewing Codex usage, reset times, and activity insights.";
+    in-out property <string> tr-about-third-party: "THIRD-PARTY SOFTWARE";
+    in-out property <string> tr-about-notices: "Slint attribution is required by its royalty-free license. Other dependency licenses and source URLs are included in THIRD_PARTY_NOTICES.md with the app.";
+    in-out property <string> tr-about-close: "Close";
+    in-out property <string> tr-btn-restore: "Restore Last";
+    in-out property <string> tr-btn-refresh-usage: "Refresh Usage";
+    in-out property <string> tr-btn-refresh-list: "Refresh List";
+    in-out property <string> tr-btn-quit: "Quit";
+    in-out property <string> tr-active-title: "ACTIVE";
+    in-out property <string> tr-detail-title: "ACCOUNT DETAILS";
+    in-out property <string> tr-active-no-account: "No account selected";
+    in-out property <string> tr-active-hint: "Save or switch an account to see identity";
+    in-out property <string> tr-active-restart-hint: "Restart Codex after switching to take effect";
+    in-out property <string> tr-token-title: "TOKEN ACTIVITY";
+    in-out property <string> tr-token-lifetime: "Lifetime";
+    in-out property <string> tr-token-peak: "Peak day";
+    in-out property <string> tr-token-streak: "Streak";
+    in-out property <string> tr-token-longest: "Longest";
+    in-out property <string> tr-token-last-seven: "LAST 7 DAYS";
+    in-out property <string> tr-activity-open: "Activity Insights";
+    in-out property <string> tr-activity-title: "Activity Insights";
+    in-out property <string> tr-activity-subtitle: "Current Codex account";
+    in-out property <string> tr-activity-back: "Back to accounts";
+    in-out property <string> tr-activity-daily: "Daily";
+    in-out property <string> tr-activity-weekly: "Weekly";
+    in-out property <string> tr-activity-cumulative: "Cumulative";
+    in-out property <string> tr-activity-longest-streak: "Longest streak";
+    in-out property <string> tr-activity-chart-title: "TOKEN ACTIVITY";
+    in-out property <string> tr-activity-chart-hint: "Past 52 weeks";
+    in-out property <string> tr-activity-insights: "ACTIVITY INSIGHTS";
+    in-out property <string> tr-activity-fast-mode: "Fast mode";
+    in-out property <string> tr-activity-reasoning: "Most used reasoning";
+    in-out property <string> tr-activity-unique-skills: "Skills explored";
+    in-out property <string> tr-activity-total-skills: "Total skill uses";
+    in-out property <string> tr-activity-threads: "Total chats";
+    in-out property <string> tr-activity-top: "MOST USED PLUGINS & SKILLS";
+    in-out property <string> tr-activity-runs: "runs";
+    in-out property <string> tr-activity-no-data: "Refresh usage to load activity data";
+    in-out property <string> tr-import-tab-login: "Browser Login";
+    in-out property <string> tr-import-tab-save: "Save Current";
+    in-out property <string> tr-import-tab-path: "From Path";
+    in-out property <string> tr-import-tab-paste: "Paste JSON";
+    in-out property <string> tr-login-hint: "Sign in with ChatGPT OAuth; the profile is saved automatically after completion";
+    in-out property <string> tr-login-alias-placeholder: "Optional alias, defaults to email prefix";
+    in-out property <string> tr-login-open: "Open Browser to Login";
+    in-out property <string> tr-login-running: "Logging in…";
+    in-out property <string> tr-login-cancel: "Cancel";
+    in-out property <string> tr-save-alias-placeholder: "Alias, e.g. work";
+    in-out property <string> tr-save-button: "Save Current";
+    in-out property <string> tr-save-import: "Import Current";
+    in-out property <string> tr-path-placeholder: "Paste full directory path to open…";
+    in-out property <string> tr-path-open: "Open Directory…";
+    in-out property <string> tr-paste-placeholder: "Paste full auth.json content here (supports ```json blocks)…";
+    in-out property <string> tr-paste-alias-placeholder: "Optional alias, defaults to email prefix";
+    in-out property <string> tr-paste-import: "Import from Paste";
+    in-out property <string> tr-paste-clipboard: "From Clipboard";
+    in-out property <string> tr-rename-title: "Rename";
+    in-out property <string> tr-rename-new-placeholder: "New alias";
+    in-out property <string> tr-rename-confirm: "Confirm";
+    in-out property <string> tr-rename-cancel: "Cancel";
+    in-out property <string> tr-profiles-title: "PROFILES";
+    in-out property <string> tr-profiles-empty: "No saved accounts yet";
+    in-out property <string> tr-profiles-empty-hint: "Use \"Save Current\" or import auth.json from path";
+    in-out property <string> tr-profiles-count: "saved";
+    in-out property <string> tr-btn-switch: "Switch";
+    in-out property <string> tr-btn-restart: "Restart";
+    in-out property <string> tr-btn-rename: "Rename";
+    in-out property <string> tr-btn-delete: "Delete";
+    in-out property <string> tr-label-in-use: "IN USE";
+    in-out property <string> tr-label-preview: "PREVIEW";
+    in-out property <string> tr-label-no-email: "No email";
+    in-out property <string> tr-label-invalid: "INVALID";
+    in-out property <string> tr-gauge-5h: "5H WINDOW";
+    in-out property <string> tr-gauge-weekly: "WEEKLY";
+    in-out property <string> tr-usage-reset: "Reset";
+    in-out property <string> tr-claude-session-hint: "Switching restarts Claude Desktop automatically";
+    in-out property <string> tr-claude-login-hint: "Open Claude Desktop, sign in, then use Save Current";
+    in-out property <string> tr-claude-paste-placeholder: "";
+    in-out property <string> tr-claude-open: "Open Claude Desktop";
+
+    callback refresh();
+    callback save-current();
+    callback import-auth();
+    callback import-live();
+    callback import-paste();
+    callback import-clipboard();
+    callback login-browser();
+    callback cancel-login();
+    callback begin-rename(string);
+    callback confirm-rename();
+    callback cancel-rename();
+
+    in-out property <int> import-tab: 0;
+    callback use-account(string);
+    callback use-account-restart(string);
+    callback preview-account(string);
+    callback remove-account(string);
+    callback restore-account();
+    callback refresh-usage();
+    callback quit();
+
+    VerticalBox {
+        padding: 0px;
+        spacing: 0px;
+
+        // Stable top navigation. Context actions live next to the content they affect.
+        Rectangle {
+            height: 68px;
+            background: Theme.panel;
+            HorizontalBox {
+                width: parent.width;
+                height: parent.height;
+                padding-left: 18px;
+                padding-right: 18px;
+                spacing: 10px;
+                alignment: center;
+
+                HorizontalBox {
+                    width: 210px;
+                    spacing: 10px;
+                    alignment: center;
+                    Rectangle {
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 9px;
+                        background: Theme.copper.with-alpha(0.14);
+                        border-width: 1px;
+                        border-color: Theme.copper.with-alpha(0.30);
+                        Text {
+                            text: "C";
+                            font-size: 13px;
+                            font-family: "Menlo";
+                            font-weight: 700;
+                            color: Theme.copper;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                    VerticalBox {
+                        spacing: 2px;
+                        alignment: center;
+                        Text {
+                            text: "Codex Account Switch";
+                            font-size: 14px;
+                            font-weight: 700;
+                            letter-spacing: 0.4px;
+                            color: Theme.text;
+                        }
+                        Text {
+                            text: "LOCAL PROFILE CONTROL";
+                            font-size: 8px;
+                            font-family: "Menlo";
+                            letter-spacing: 1px;
+                            color: Theme.faint;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: 186px;
+                    height: 36px;
+                    border-radius: 10px;
+                    background: Theme.bg.with-alpha(0.52);
+                    border-width: 1px;
+                    border-color: Theme.line.with-alpha(0.72);
+                    HorizontalBox {
+                        padding: 3px;
+                        spacing: 2px;
+                        for provider[idx] in ["Codex", "Claude Desktop"]: Rectangle {
+                            private property <bool> active: provider-index == idx;
+                            height: 28px;
+                            horizontal-stretch: 1;
+                            border-radius: 7px;
+                            background: active ? Theme.surface : (ptouch.has-hover ? Theme.elevated : transparent);
+                            ptouch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.show-activity = false;
+                                    root.set-provider(idx);
+                                }
+                            }
+                            Text {
+                                text: provider;
+                                font-size: 10px;
+                                font-weight: 700;
+                                color: active ? Theme.copper : Theme.muted;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                Rectangle { horizontal-stretch: 1; background: transparent; }
+
+                // Language selector
+                lang-selector := Rectangle {
+                    width: 96px;
+                    height: 34px;
+                    border-radius: 8px;
+                    background: Theme.elevated;
+                    border-width: 1px;
+                    border-color: Theme.line.with-alpha(0.76);
+
+                    HorizontalBox {
+                        padding-left: 8px;
+                        padding-right: 6px;
+                        alignment: center;
+                        Text {
+                            text: ["English", "简体中文", "繁體中文", "日本語", "한국어", "Français", "Español"][lang-index];
+                            font-size: 10px;
+                            color: Theme.text;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: "▾";
+                            font-size: 10px;
+                            color: Theme.muted;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { lang-popup.show(); }
+                    }
+                }
+
+                GhostButton {
+                    label: tr-btn-about;
+                    clicked => { show-about = true; }
+                }
+                GhostButton {
+                    label: tr-btn-quit;
+                    danger: true;
+                    clicked => { quit(); }
+                }
+            }
+        }
+
+        Rectangle { height: 1px; background: Theme.line; }
+
+        // Language dropdown overlay (absolute positioned, right-aligned below top bar)
+        lang-popup := PopupWindow {
+            x: lang-selector.x + lang-selector.width - 216px;
+            y: 68px;
+            width: 216px;
+            Rectangle {
+                border-radius: 8px;
+                background: Theme.elevated;
+                border-width: 1px;
+                border-color: Theme.line;
+                HorizontalBox {
+                    padding: 4px;
+                    spacing: 2px;
+                    VerticalBox {
+                        spacing: 2px;
+                        for lang[idx] in ["English", "简体中文", "繁體中文", "日本語"]: LanguageOption {
+                            label: lang;
+                            selected: idx == lang-index;
+                            clicked => {
+                                root.set-language(idx);
+                                lang-popup.close();
+                            }
+                        }
+                    }
+                    VerticalBox {
+                        spacing: 2px;
+                        for lang[idx] in ["한국어", "Français", "Español"]: LanguageOption {
+                            label: lang;
+                            selected: idx + 4 == lang-index;
+                            clicked => {
+                                root.set-language(idx + 4);
+                                lang-popup.close();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        HorizontalBox {
+            padding-left: 18px;
+            padding-right: 18px;
+            padding-top: 16px;
+            padding-bottom: 16px;
+            spacing: 18px;
+            vertical-stretch: 1;
+
+            // Left: active account gauges (original)
+            Rectangle {
+                width: 270px;
+                border-radius: 14px;
+                background: Theme.panel;
+                border-width: 1px;
+                border-color: Theme.line.with-alpha(0.78);
+                vertical-stretch: 1;
+
+                ScrollView {
+                    VerticalBox {
+                        padding: 17px;
+                        spacing: 11px;
+
+                    HorizontalBox {
+                        alignment: center;
+                        Text {
+                            text: current-alias != "" && current-alias != active-alias ? tr-detail-title : tr-active-title;
+                            font-size: 10px;
+                            font-family: "Menlo";
+                            letter-spacing: 1.2px;
+                            color: Theme.muted;
+                            horizontal-stretch: 1;
+                            vertical-alignment: center;
+                        }
+                        if provider-index == 0: GhostButton {
+                            label: tr-btn-refresh-usage;
+                            btn-height: 27px;
+                            solid: true;
+                            clicked => { refresh-usage(); }
+                        }
+                    }
+
+                    if current-alias == "": VerticalBox {
+                        padding-top: 34px;
+                        spacing: 10px;
+                        alignment: center;
+                        HorizontalBox {
+                            alignment: center;
+                            Rectangle {
+                                width: 52px;
+                                height: 52px;
+                                border-radius: 26px;
+                                background: Theme.elevated;
+                                border-width: 1px;
+                                border-color: Theme.line;
+                                Text {
+                                    text: "↔";
+                                    font-size: 20px;
+                                    color: Theme.copper;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                        Text {
+                            text: tr-active-no-account;
+                            font-size: 18px;
+                            font-weight: 700;
+                            color: Theme.text;
+                            horizontal-alignment: center;
+                        }
+                        Text {
+                            text: tr-active-hint;
+                            font-size: 11px;
+                            color: Theme.muted;
+                            wrap: word-wrap;
+                            horizontal-alignment: center;
+                        }
+                    }
+
+                    if current-alias != "": HorizontalBox {
+                        spacing: 8px;
+                        Text {
+                            text: current-alias;
+                            font-size: 24px;
+                            font-weight: 700;
+                            color: Theme.text;
+                            wrap: word-wrap;
+                            horizontal-stretch: 1;
+                        }
+                        Text {
+                            text: current-alias == active-alias ? tr-label-in-use : tr-label-preview;
+                            font-size: 9px;
+                            font-family: "Menlo";
+                            font-weight: 700;
+                            color: current-alias == active-alias ? Theme.ok : Theme.copper;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    if current-alias != "": Text {
+                        text: current-email == "" ? tr-label-no-email : current-email;
+                        font-size: 12px;
+                        color: Theme.muted;
+                        wrap: word-wrap;
+                    }
+
+                    if current-alias != "": HorizontalBox {
+                        spacing: 8px;
+                        if current-plan != "": PlanBadge {
+                            label: current-plan;
+                        }
+                        if current-credits != "": Text {
+                            text: "credits " + current-credits;
+                            font-size: 11px;
+                            font-family: "Menlo";
+                            color: Theme.ok;
+                            vertical-alignment: center;
+                        }
+                        Rectangle { horizontal-stretch: 1; background: transparent; }
+                    }
+
+                    if current-alias != "": Rectangle { height: 1px; background: Theme.line.with-alpha(0.72); }
+
+                    if current-alias != "" && provider-index == 0 && current-token-lifetime != "": VerticalBox {
+                        spacing: 6px;
+                        padding-top: 2px;
+                        padding-bottom: 2px;
+
+                        Text {
+                            text: tr-token-title;
+                            font-size: 9px;
+                            font-family: "Menlo";
+                            letter-spacing: 1.2px;
+                            color: Theme.copper;
+                        }
+
+                        GridLayout {
+                            spacing-horizontal: 12px;
+                            spacing-vertical: 4px;
+                            Row {
+                                Text { text: tr-token-lifetime; font-size: 11px; font-family: "Menlo"; color: Theme.muted; }
+                                Text { text: current-token-lifetime; font-size: 12px; font-weight: 700; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
+                            }
+                            Row {
+                                Text { text: tr-token-peak; font-size: 11px; font-family: "Menlo"; color: Theme.muted; }
+                                Text { text: current-token-peak; font-size: 12px; font-weight: 700; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
+                            }
+                            Row {
+                                Text { text: tr-token-streak; font-size: 11px; font-family: "Menlo"; color: Theme.muted; }
+                                Text { text: current-token-streak; font-size: 12px; font-weight: 700; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
+                            }
+                            Row {
+                                Text { text: tr-token-longest; font-size: 11px; font-family: "Menlo"; color: Theme.muted; }
+                                Text { text: current-token-longest; font-size: 12px; font-weight: 700; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
+                            }
+                        }
+
+                        if current-token-week != "": HorizontalBox {
+                            Text {
+                                text: tr-token-last-seven;
+                                font-size: 9px;
+                                font-family: "Menlo";
+                                letter-spacing: 1px;
+                                color: Theme.muted;
+                                horizontal-stretch: 1;
+                            }
+                            Text {
+                                text: current-token-week;
+                                font-size: 10px;
+                                font-weight: 700;
+                                font-family: "Menlo";
+                                color: Theme.text;
+                            }
+                        }
+
+                        if current-token-week != "": trend-chart := Rectangle {
+                            height: 30px;
+                            background: Theme.bg.with-alpha(0.48);
+                            border-radius: 7px;
+                            border-width: 1px;
+                            border-color: Theme.line.with-alpha(0.55);
+
+                            for value[idx] in root.current-token-trend: Rectangle {
+                                width: (trend-chart.width - 36px) / 7;
+                                x: 3px + idx * ((trend-chart.width - 36px) / 7 + 5px);
+                                height: Math.max(2px, value * 21px);
+                                y: trend-chart.height - self.height - 3px;
+                                border-radius: 2px;
+                                background: value > 0 ? Theme.copper : Theme.line;
+                            }
+                        }
+
+                        GhostButton {
+                            label: tr-activity-open;
+                            btn-height: 30px;
+                            solid: true;
+                            clicked => {
+                                activity-range = 0;
+                                show-activity = true;
+                            }
+                        }
+                    }
+
+                    if current-alias != "" && provider-index == 0 && current-token-lifetime != "": Rectangle { height: 1px; background: Theme.line.with-alpha(0.72); }
+
+                    if current-alias != "" && provider-index == 0: Gauge {
+                        label: tr-gauge-5h;
+                        percent: current-primary;
+                        reset-text: current-primary-reset;
+                        available: current-primary-available;
+                    }
+                    if current-alias != "" && provider-index == 0: Gauge {
+                        label: tr-gauge-weekly;
+                        percent: current-secondary;
+                        reset-text: current-secondary-reset;
+                        available: current-secondary-available;
+                    }
+
+                    Rectangle { vertical-stretch: 1; background: transparent; }
+
+                    if current-alias != "" && provider-index == 1: Text {
+                        text: tr-claude-session-hint;
+                        font-size: 11px;
+                        color: Theme.faint;
+                        wrap: word-wrap;
+                    }
+                }
+                }
+            }
+
+            // Right: import tabs + list
+            VerticalBox {
+                spacing: 12px;
+                horizontal-stretch: 1;
+
+                Rectangle {
+                    // Content height differs by mode. Rename is a focused
+                    // state that replaces the import form inside this card.
+                    height: rename-from != ""
+                        ? 124px
+                        : (import-tab == 3
+                            ? 196px
+                            : (import-tab == 0 ? 148px : 124px));
+                    vertical-stretch: 0;
+                    border-radius: 14px;
+                    background: Theme.panel;
+                    border-width: 1px;
+                    border-color: Theme.line.with-alpha(0.78);
+
+                    VerticalBox {
+                        padding: 12px;
+                        spacing: 8px;
+
+                        // Import method tabs
+                        HorizontalBox {
+                            spacing: 6px;
+                            for tab[idx] in [tr-import-tab-login, tr-import-tab-save, tr-import-tab-path, tr-import-tab-paste]: Rectangle {
+                                private property <bool> active: import-tab == idx;
+                                visible: provider-index == 0 || idx < 2;
+                                height: 30px;
+                                min-width: 0px;
+                                horizontal-stretch: 1;
+                                border-radius: 7px;
+                                background: active ? Theme.surface : (itouch.has-hover ? Theme.elevated : Theme.bg.with-alpha(0.32));
+                                border-width: 1px;
+                                border-color: active ? Theme.copper.with-alpha(0.28) : Theme.line.with-alpha(0.48);
+
+                                itouch := TouchArea {
+                                    clicked => { import-tab = idx; }
+                                }
+
+                                Text {
+                                    text: provider-index == 1 && idx == 0 ? "Claude Desktop" : tab;
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: active ? Theme.copper : Theme.muted;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        Rectangle { height: 1px; background: Theme.line; }
+
+                        // Browser login
+                        if rename-from == "" && import-tab == 0: VerticalBox {
+                            spacing: 8px;
+                            Text {
+                                text: provider-index == 0
+                                    ? tr-login-hint
+                                    : tr-claude-login-hint;
+                                font-size: 11px;
+                                color: Theme.muted;
+                                wrap: word-wrap;
+                            }
+                            HorizontalBox {
+                                spacing: 8px;
+                                Field {
+                                    visible: provider-index == 0;
+                                    text <=> login-alias;
+                                    placeholder: tr-login-alias-placeholder;
+                                    horizontal-stretch: 1;
+                                    accepted => { login-browser(); }
+                                }
+                                GhostButton {
+                                    label: provider-index == 1
+                                        ? tr-claude-open
+                                        : (login-running ? tr-login-running : tr-login-open);
+                                    emphasis: true;
+                                    enabled: !login-running;
+                                    clicked => { login-browser(); }
+                                }
+                                if provider-index == 0 && login-running: GhostButton {
+                                    label: tr-login-cancel;
+                                    solid: true;
+                                    clicked => { cancel-login(); }
+                                }
+                            }
+                        }
+
+                        // Save current
+                        if rename-from == "" && import-tab == 1: HorizontalBox {
+                            spacing: 8px;
+                            Field {
+                                text <=> save-alias;
+                                placeholder: tr-save-alias-placeholder;
+                                horizontal-stretch: 1;
+                                accepted => { save-current(); }
+                            }
+                            GhostButton {
+                                label: tr-save-button;
+                                emphasis: true;
+                                clicked => { save-current(); }
+                            }
+                            GhostButton {
+                                label: tr-save-import;
+                                clicked => { import-live(); }
+                            }
+                        }
+
+                        // From path
+                        if rename-from == "" && import-tab == 2: HorizontalBox {
+                            spacing: 8px;
+                            Field {
+                                text <=> browse-path;
+                                placeholder: tr-path-placeholder;
+                                horizontal-stretch: 1;
+                                accepted => { import-auth(); }
+                            }
+                            GhostButton {
+                                label: tr-path-open;
+                                clicked => { import-auth(); }
+                            }
+                        }
+
+                        // Paste text
+                        if rename-from == "" && import-tab == 3: VerticalBox {
+                            spacing: 8px;
+                            TextArea {
+                                text <=> paste-json;
+                                placeholder: provider-index == 0
+                                    ? tr-paste-placeholder
+                                    : tr-claude-paste-placeholder;
+                                area-height: 88px;
+                            }
+                            HorizontalBox {
+                                spacing: 8px;
+                                Field {
+                                    text <=> paste-alias;
+                                    placeholder: tr-paste-alias-placeholder;
+                                    horizontal-stretch: 1;
+                                    accepted => { import-paste(); }
+                                }
+                                GhostButton {
+                                    label: tr-paste-import;
+                                    emphasis: true;
+                                    clicked => { import-paste(); }
+                                }
+                                GhostButton {
+                                    label: tr-paste-clipboard;
+                                    solid: true;
+                                    clicked => { import-clipboard(); }
+                                }
+                            }
+                        }
+
+                        if rename-from != "": HorizontalBox {
+                            spacing: 8px;
+                            Text {
+                                text: tr-rename-title;
+                                font-size: 11px;
+                                font-family: "Menlo";
+                                color: Theme.copper;
+                                vertical-alignment: center;
+                            }
+                            Text {
+                                text: rename-from;
+                                font-size: 11px;
+                                font-family: "Menlo";
+                                color: Theme.muted;
+                                vertical-alignment: center;
+                            }
+                            Text {
+                                text: "→";
+                                font-size: 11px;
+                                color: Theme.faint;
+                                vertical-alignment: center;
+                            }
+                            Field {
+                                text <=> rename-to;
+                                placeholder: tr-rename-new-placeholder;
+                                horizontal-stretch: 1;
+                                accepted => { confirm-rename(); }
+                            }
+                            GhostButton {
+                                label: tr-rename-confirm;
+                                emphasis: true;
+                                clicked => { confirm-rename(); }
+                            }
+                            GhostButton {
+                                label: tr-rename-cancel;
+                                clicked => { cancel-rename(); }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    Text {
+                        text: tr-profiles-title;
+                        font-size: 10px;
+                        font-family: "Menlo";
+                        letter-spacing: 1.2px;
+                        color: Theme.muted;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                    Text {
+                        text: accounts.length + " " + tr-profiles-count;
+                        font-size: 11px;
+                        font-family: "Menlo";
+                        color: Theme.muted;
+                        vertical-alignment: center;
+                    }
+                    GhostButton {
+                        label: tr-btn-refresh-list;
+                        btn-height: 28px;
+                        clicked => { refresh(); }
+                    }
+                    GhostButton {
+                        label: tr-btn-restore;
+                        btn-height: 28px;
+                        solid: true;
+                        enabled: can-restore;
+                        clicked => { restore-account(); }
+                    }
+                }
+
+                Rectangle {
+                    border-radius: 14px;
+                    background: transparent;
+                    border-width: 0px;
+                    vertical-stretch: 1;
+
+                    ScrollView {
+                        VerticalBox {
+                            padding: 0px;
+                            spacing: 6px;
+
+                            if accounts.length == 0: VerticalBox {
+                                padding-top: 78px;
+                                padding-left: 28px;
+                                padding-right: 28px;
+                                spacing: 9px;
+                                alignment: center;
+                                HorizontalBox {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 42px;
+                                        height: 42px;
+                                        border-radius: 10px;
+                                        background: Theme.elevated;
+                                        border-width: 1px;
+                                        border-color: Theme.line;
+                                        Text {
+                                            text: "+";
+                                            font-size: 24px;
+                                            color: Theme.copper;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                                Text {
+                                    text: tr-profiles-empty;
+                                    font-size: 14px;
+                                    font-weight: 700;
+                                    color: Theme.text;
+                                    horizontal-alignment: center;
+                                }
+                                Text {
+                                    text: tr-profiles-empty-hint;
+                                    font-size: 11px;
+                                    color: Theme.muted;
+                                    horizontal-alignment: center;
+                                    wrap: word-wrap;
+                                }
+                            }
+
+                            for acc in root.accounts: account-card := Rectangle {
+                                private property <bool> selected: acc.alias == root.current-alias;
+                                height: provider-index == 0
+                                    ? (acc.usage_error != "" ? 134px : 114px)
+                                    : 64px;
+                                vertical-stretch: 0;
+                                clip: true;
+                                border-radius: 11px;
+                                background: selected ? Theme.copper.with-alpha(0.09)
+                                    : (acc.is_current ? Theme.ok.with-alpha(0.045) : Theme.panel);
+                                border-width: 1px;
+                                border-color: selected ? Theme.copper.with-alpha(0.58)
+                                    : (acc.is_current ? Theme.ok.with-alpha(0.30) : Theme.line.with-alpha(0.72));
+                                accessible-role: button;
+                                accessible-label: tr-detail-title + " · " + acc.alias;
+                                accessible-action-default => { root.preview-account(acc.alias); }
+
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.preview-account(acc.alias); }
+                                }
+
+                                VerticalBox {
+                                    width: parent.width;
+                                    height: parent.height;
+                                    padding-top: 7px;
+                                    padding-bottom: 7px;
+                                    padding-left: 12px;
+                                    padding-right: 12px;
+                                    spacing: 4px;
+                                    alignment: start;
+
+                                    HorizontalBox {
+                                        height: 26px;
+                                        horizontal-stretch: 1;
+                                        vertical-stretch: 0;
+                                        spacing: 10px;
+
+                                        Rectangle {
+                                            width: 4px;
+                                            height: 24px;
+                                            border-radius: 3px;
+                                            background: account-card.selected ? Theme.copper
+                                                : (acc.is_current ? Theme.ok : Theme.line.with-alpha(0.72));
+                                        }
+
+                                        HorizontalBox {
+                                            horizontal-stretch: 1;
+                                            height: 26px;
+                                            vertical-stretch: 0;
+                                            spacing: 8px;
+                                            Text {
+                                                text: acc.alias;
+                                                height: 26px;
+                                                font-size: 13px;
+                                                font-weight: 700;
+                                                color: Theme.text;
+                                                vertical-alignment: center;
+                                            }
+                                            if acc.plan != "": Text {
+                                                text: acc.plan;
+                                                height: 26px;
+                                                font-size: 10px;
+                                                font-family: "Menlo";
+                                                color: Theme.muted;
+                                                vertical-alignment: center;
+                                            }
+                                            if acc.is_current: Text {
+                                                text: tr-label-in-use;
+                                                height: 26px;
+                                                font-size: 9px;
+                                                font-family: "Menlo";
+                                                font-weight: 700;
+                                                color: Theme.ok;
+                                                vertical-alignment: center;
+                                            }
+                                            if account-card.selected && !acc.is_current: Text {
+                                                text: tr-label-preview;
+                                                height: 26px;
+                                                font-size: 9px;
+                                                font-family: "Menlo";
+                                                font-weight: 700;
+                                                color: Theme.copper;
+                                                vertical-alignment: center;
+                                            }
+                                            if !acc.is_valid: Text {
+                                                text: tr-label-invalid;
+                                                height: 26px;
+                                                font-size: 9px;
+                                                font-family: "Menlo";
+                                                font-weight: 700;
+                                                color: Theme.danger;
+                                                vertical-alignment: center;
+                                            }
+                                            Rectangle { horizontal-stretch: 1; background: transparent; }
+
+                                        }
+
+                                        if !acc.is_current: GhostButton {
+                                            label: tr-btn-switch;
+                                            emphasis: true;
+                                            enabled: acc.is_valid;
+                                            btn-height: 26px;
+                                            min-width: 48px;
+                                            clicked => { use-account(acc.alias); }
+                                        }
+                                        if provider-index == 0 && !acc.is_current: GhostButton {
+                                            label: tr-btn-restart;
+                                            solid: true;
+                                            enabled: acc.is_valid;
+                                            btn-height: 26px;
+                                            min-width: 48px;
+                                            clicked => { use-account-restart(acc.alias); }
+                                        }
+                                        GhostButton {
+                                            label: tr-btn-rename;
+                                            solid: true;
+                                            btn-height: 26px;
+                                            min-width: 48px;
+                                            clicked => { begin-rename(acc.alias); }
+                                        }
+                                        GhostButton {
+                                            label: tr-btn-delete;
+                                            danger: true;
+                                            btn-height: 26px;
+                                            min-width: 48px;
+                                            clicked => { remove-account(acc.alias); }
+                                        }
+                                    }
+
+                                    HorizontalBox {
+                                        height: 18px;
+                                        horizontal-stretch: 1;
+                                        vertical-stretch: 0;
+                                        padding-left: 14px;
+                                        spacing: 8px;
+
+                                        Text {
+                                            text: acc.email == "" ? tr-label-no-email : acc.email;
+                                            height: 18px;
+                                            font-size: 10px;
+                                            color: Theme.muted;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                        }
+                                        if provider-index == 0 && acc.usage_updated != "": Text {
+                                            text: acc.usage_updated;
+                                            height: 18px;
+                                            font-size: 9px;
+                                            font-family: "Menlo";
+                                            color: Theme.faint;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    if provider-index == 0 && (acc.primary_available || acc.secondary_available): HorizontalBox {
+                                        height: 38px;
+                                        padding-left: 14px;
+                                        vertical-stretch: 0;
+                                        spacing: 8px;
+                                        if acc.primary_available: UsageChip {
+                                            label: tr-gauge-5h;
+                                            percent: acc.primary_pct;
+                                            reset-text: acc.primary_reset;
+                                            reset-label: tr-usage-reset;
+                                            attention: acc.primary_pct >= 90;
+                                        }
+                                        if acc.secondary_available: UsageChip {
+                                            label: tr-gauge-weekly;
+                                            percent: acc.secondary_pct;
+                                            reset-text: acc.secondary_reset;
+                                            reset-label: tr-usage-reset;
+                                            attention: acc.secondary_pct >= 90;
+                                        }
+                                    }
+
+                                    if provider-index == 0 && !acc.primary_available && !acc.secondary_available: HorizontalBox {
+                                        height: 38px;
+                                        padding-left: 14px;
+                                        vertical-stretch: 0;
+                                        Text {
+                                            text: acc.usage_summary;
+                                            height: 38px;
+                                            font-size: 11px;
+                                            font-family: "Menlo";
+                                            color: acc.usage_attention ? Theme.danger : Theme.faint;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                        }
+                                    }
+
+                                    if acc.usage_error != "": HorizontalBox {
+                                        height: 16px;
+                                        padding-left: 14px;
+                                        Text {
+                                            text: acc.usage_error;
+                                            height: 16px;
+                                            font-size: 10px;
+                                            color: Theme.danger;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            height: 32px;
+            background: Theme.panel;
+            border-width: 1px;
+            border-color: Theme.line;
+            HorizontalBox {
+                width: parent.width;
+                height: parent.height;
+                padding-left: 16px;
+                padding-right: 16px;
+                spacing: 8px;
+                alignment: center;
+                Rectangle {
+                    width: 7px;
+                    height: 7px;
+                    border-radius: 4px;
+                    background: Theme.ok;
+                }
+                Text {
+                    text: status-text;
+                    font-size: 10px;
+                    font-family: "Menlo";
+                    color: Theme.muted;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    horizontal-stretch: 1;
+                }
+                Text {
+                    text: provider-index == 0 ? "CODEX" : "CLAUDE DESKTOP";
+                    font-size: 9px;
+                    font-family: "Menlo";
+                    letter-spacing: 1px;
+                    color: Theme.faint;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    if show-activity: Rectangle {
+        z: 50;
+        x: 0px;
+        y: 69px;
+        width: parent.width;
+        height: parent.height - 101px;
+        background: Theme.bg;
+
+        ScrollView {
+            VerticalBox {
+                padding: 18px;
+                spacing: 12px;
+
+                HorizontalBox {
+                    height: 34px;
+                    spacing: 10px;
+                    VerticalBox {
+                        spacing: 1px;
+                        horizontal-stretch: 1;
+                        Text {
+                            text: tr-activity-title;
+                            font-size: 18px;
+                            font-weight: 700;
+                            color: Theme.text;
+                        }
+                        Text {
+                            text: tr-activity-subtitle + " · " + current-alias;
+                            font-size: 9px;
+                            font-family: "Menlo";
+                            color: Theme.faint;
+                        }
+                    }
+                    GhostButton {
+                        label: tr-btn-refresh-usage;
+                        solid: true;
+                        clicked => { refresh-usage(); }
+                    }
+                    GhostButton {
+                        label: tr-activity-back;
+                        clicked => { show-activity = false; }
+                    }
+                }
+
+                if current-token-lifetime == "": Rectangle {
+                    height: 430px;
+                    border-radius: 14px;
+                    background: Theme.panel;
+                    border-width: 1px;
+                    border-color: Theme.line;
+                    VerticalBox {
+                        alignment: center;
+                        spacing: 12px;
+                        Text {
+                            text: tr-activity-no-data;
+                            font-size: 13px;
+                            color: Theme.muted;
+                            horizontal-alignment: center;
+                        }
+                        HorizontalBox {
+                            alignment: center;
+                            GhostButton {
+                                label: tr-btn-refresh-usage;
+                                emphasis: true;
+                                clicked => { refresh-usage(); }
+                            }
+                        }
+                    }
+                }
+
+                if current-token-lifetime != "": HorizontalBox {
+                    height: 72px;
+                    spacing: 8px;
+                    ActivityMetric { value: current-token-lifetime; label: tr-token-lifetime; }
+                    ActivityMetric { value: current-token-peak; label: tr-token-peak; }
+                    ActivityMetric { value: current-token-longest; label: tr-token-longest; }
+                    ActivityMetric { value: current-token-streak; label: tr-token-streak; }
+                    ActivityMetric { value: current-token-longest-streak; label: tr-activity-longest-streak; }
+                }
+
+                if current-token-lifetime != "": Rectangle {
+                    height: 190px;
+                    border-radius: 14px;
+                    background: Theme.panel;
+                    border-width: 1px;
+                    border-color: Theme.line.with-alpha(0.78);
+                    VerticalBox {
+                        padding: 14px;
+                        spacing: 10px;
+                        HorizontalBox {
+                            height: 28px;
+                            Text {
+                                text: tr-activity-chart-title;
+                                font-size: 11px;
+                                font-family: "Menlo";
+                                font-weight: 700;
+                                letter-spacing: 1px;
+                                color: Theme.text;
+                                horizontal-stretch: 1;
+                                vertical-alignment: center;
+                            }
+                            Text {
+                                text: tr-activity-chart-hint;
+                                font-size: 9px;
+                                font-family: "Menlo";
+                                color: Theme.faint;
+                                vertical-alignment: center;
+                            }
+                            for tab[idx] in [tr-activity-daily, tr-activity-weekly, tr-activity-cumulative]: Rectangle {
+                                width: 72px;
+                                height: 28px;
+                                border-radius: 7px;
+                                background: activity-range == idx ? Theme.copper.with-alpha(0.16) : transparent;
+                                border-width: activity-range == idx ? 1px : 0px;
+                                border-color: Theme.copper.with-alpha(0.72);
+                                accessible-role: button;
+                                accessible-label: tab;
+                                accessible-action-default => { activity-range = idx; }
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { activity-range = idx; }
+                                }
+                                Text {
+                                    text: tab;
+                                    font-size: 10px;
+                                    font-weight: activity-range == idx ? 700 : 400;
+                                    color: activity-range == idx ? Theme.copper : Theme.muted;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        activity-chart := Rectangle {
+                            height: 116px;
+                            background: Theme.bg.with-alpha(0.36);
+                            border-radius: 10px;
+
+                            if activity-range == 0: Rectangle {
+                                x: (parent.width - 728px) / 2;
+                                y: 8px;
+                                width: 728px;
+                                height: 100px;
+                                for value[idx] in root.current-token-daily: Rectangle {
+                                    x: Math.floor(idx / 7) * 14px;
+                                    y: Math.mod(idx, 7) * 14px;
+                                    width: 10px;
+                                    height: 10px;
+                                    border-radius: 3px;
+                                    background: value <= 0
+                                        ? Theme.line.with-alpha(0.36)
+                                        : Theme.copper.with-alpha(0.22 + value * 0.78);
+                                }
+                            }
+
+                            if activity-range == 1: Rectangle {
+                                x: 10px;
+                                y: 8px;
+                                width: parent.width - 20px;
+                                height: 100px;
+                                for value[idx] in root.current-token-weekly: Rectangle {
+                                    width: max(3px, parent.width / 52 - 4px);
+                                    x: idx * parent.width / 52 + 2px;
+                                    height: max(2px, value * 94px);
+                                    y: parent.height - self.height;
+                                    border-radius: 2px;
+                                    background: value > 0 ? Theme.copper : Theme.line.with-alpha(0.36);
+                                }
+                            }
+
+                            if activity-range == 2: Rectangle {
+                                x: 10px;
+                                y: 8px;
+                                width: parent.width - 20px;
+                                height: 100px;
+                                for value[idx] in root.current-token-cumulative: Rectangle {
+                                    width: max(3px, parent.width / 52 - 4px);
+                                    x: idx * parent.width / 52 + 2px;
+                                    height: max(2px, value * 94px);
+                                    y: parent.height - self.height;
+                                    border-radius: 2px;
+                                    background: value > 0 ? Theme.ok : Theme.line.with-alpha(0.36);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if current-token-lifetime != "": HorizontalBox {
+                    height: 214px;
+                    spacing: 12px;
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: 14px;
+                        background: Theme.panel;
+                        border-width: 1px;
+                        border-color: Theme.line.with-alpha(0.78);
+                        VerticalBox {
+                            padding: 14px;
+                            spacing: 8px;
+                            Text {
+                                text: tr-activity-insights;
+                                font-size: 10px;
+                                font-family: "Menlo";
+                                font-weight: 700;
+                                letter-spacing: 1px;
+                                color: Theme.text;
+                            }
+                            GridLayout {
+                                spacing-horizontal: 10px;
+                                spacing-vertical: 8px;
+                                Row {
+                                    Text { text: tr-activity-fast-mode; font-size: 11px; color: Theme.muted; }
+                                    Text { text: current-fast-mode; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
+                                }
+                                Row {
+                                    Text { text: tr-activity-reasoning; font-size: 11px; color: Theme.muted; }
+                                    Text { text: current-reasoning; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; overflow: elide; }
+                                }
+                                Row {
+                                    Text { text: tr-activity-unique-skills; font-size: 11px; color: Theme.muted; }
+                                    Text { text: current-unique-skills; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
+                                }
+                                Row {
+                                    Text { text: tr-activity-total-skills; font-size: 11px; color: Theme.muted; }
+                                    Text { text: current-total-skills; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
+                                }
+                                Row {
+                                    Text { text: tr-activity-threads; font-size: 11px; color: Theme.muted; }
+                                    Text { text: current-total-threads; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 1.35;
+                        border-radius: 14px;
+                        background: Theme.panel;
+                        border-width: 1px;
+                        border-color: Theme.line.with-alpha(0.78);
+                        VerticalBox {
+                            padding: 14px;
+                            spacing: 6px;
+                            Text {
+                                text: tr-activity-top;
+                                font-size: 10px;
+                                font-family: "Menlo";
+                                font-weight: 700;
+                                letter-spacing: 1px;
+                                color: Theme.text;
+                            }
+                            for item in root.current-top-invocations: HorizontalBox {
+                                height: 27px;
+                                spacing: 8px;
+                                Rectangle {
+                                    width: 42px;
+                                    height: 20px;
+                                    border-radius: 10px;
+                                    background: Theme.elevated;
+                                    border-width: 1px;
+                                    border-color: Theme.line;
+                                    Text {
+                                        text: item.kind;
+                                        font-size: 8px;
+                                        font-family: "Menlo";
+                                        color: Theme.copper;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+                                }
+                                Text {
+                                    text: item.name;
+                                    font-size: 11px;
+                                    color: Theme.text;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+                                Text {
+                                    text: item.count + " " + tr-activity-runs;
+                                    font-size: 10px;
+                                    font-family: "Menlo";
+                                    color: Theme.muted;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if show-about: Rectangle {
+        z: 100;
+        background: #00000099;
+        TouchArea { clicked => { show-about = false; } }
+        Rectangle {
+            width: 620px;
+            height: 452px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: 16px;
+            background: Theme.elevated;
+            border-width: 1px;
+            border-color: Theme.line.with-alpha(0.92);
+            TouchArea {}
+            VerticalBox {
+                padding: 22px;
+                spacing: 11px;
+
+                HorizontalBox {
+                    spacing: 10px;
+                    Rectangle {
+                        width: 5px;
+                        height: 26px;
+                        border-radius: 3px;
+                        background: Theme.copper;
+                    }
+                    Text {
+                        text: "GCSA 内部使用小工具";
+                        font-size: 19px;
+                        font-weight: 700;
+                        color: Theme.text;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: tr-about-description;
+                    height: 62px;
+                    font-size: 12px;
+                    color: Theme.muted;
+                    wrap: word-wrap;
+                    vertical-alignment: center;
+                }
+
+                Rectangle { height: 1px; background: Theme.line; }
+
+                Text {
+                    text: tr-about-third-party;
+                    font-size: 10px;
+                    font-family: "Menlo";
+                    font-weight: 700;
+                    letter-spacing: 1px;
+                    color: Theme.copper;
+                }
+
+                Rectangle {
+                    height: 120px;
+                    border-radius: 10px;
+                    background: Theme.panel;
+                    border-width: 1px;
+                    border-color: Theme.line.with-alpha(0.78);
+                    AboutSlint {
+                        x: (parent.width - self.width) / 2;
+                        width: 300px;
+                        height: parent.height;
+                    }
+                }
+
+                Text {
+                    text: "Slint 1.17.1  ·  LicenseRef-Slint-Royalty-free-2.0  ·  https://slint.dev";
+                    height: 20px;
+                    font-size: 10px;
+                    font-family: "Menlo";
+                    color: Theme.muted;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: tr-about-notices;
+                    height: 38px;
+                    font-size: 10px;
+                    color: Theme.muted;
+                    wrap: word-wrap;
+                    vertical-alignment: center;
+                }
+
+                HorizontalBox {
+                    Rectangle { horizontal-stretch: 1; }
+                    GhostButton {
+                        label: tr-about-close;
+                        solid: true;
+                        clicked => { show-about = false; }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,11 @@
+/target
+/dist
+/assets/AppIcon.iconset
+**/*.rs.bk
+.DS_Store
+**/.DS_Store
+*.swp
+.idea/
+.vscode/
+*.zip
+*.log

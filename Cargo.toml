@@ -1,0 +1,36 @@
+[package]
+name = "codex-account-switch"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.92"
+description = "Cross-platform desktop app for switching Codex and Claude Desktop accounts"
+repository = "https://github.com/gcsagroup/codex-account-switch"
+license = "MIT"
+publish = false
+
+[dependencies]
+arboard = "3"
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+fs4 = "0.13"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+rfd = "0.15"
+rusqlite = { version = "0.40.2", default-features = false, features = ["backup", "bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+slint = "1.17"
+thiserror = "2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+
+[build-dependencies]
+slint-build = "1.17"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
