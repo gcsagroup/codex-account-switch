@@ -62,7 +62,7 @@ Slint 視窗 / 系統匣
 
 ## 額度與活動更新
 
-- `wham/usage` 提供 plan、credits 與額度視窗。
+- `wham/usage` 提供 plan、credits、可用重設次數與額度視窗。
 - `wham/profiles/me` 提供 Token、連續天數、工作階段時長、每日/每週/累計 bucket、推理、技能、聊天與外掛/技能排行。
 - 依視窗時長分類短視窗與每週視窗；相對重設值換算為本機絕對時間。
 - 結果原子快取至 `cache/usage.json`；錯誤只保留於記憶體/UI，不包含 token。

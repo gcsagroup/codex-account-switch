@@ -62,7 +62,7 @@ Local files, ChatGPT endpoints, Codex/Claude desktop processes
 
 ## Usage and activity refresh
 
-- `wham/usage` supplies plan, credits, and limit windows.
+- `wham/usage` supplies plan, credits, available reset counts, and limit windows.
 - `wham/profiles/me` supplies token totals, streaks, session duration, daily/weekly/cumulative buckets, reasoning, skills, chats, and plugin/skill rankings.
 - Window duration classifies short and weekly limits; relative reset values become local absolute times.
 - Results are atomically cached in `cache/usage.json`; errors stay in memory/UI and do not contain tokens.

@@ -62,7 +62,7 @@ Slint 窗口 / 系统托盘
 
 ## 额度与活动刷新
 
-- `wham/usage` 提供 plan、credits 和额度窗口。
+- `wham/usage` 提供 plan、credits、可用重置次数和额度窗口。
 - `wham/profiles/me` 提供 Token、连续天数、会话时长、每日/每周/累计 bucket、推理、技能、聊天和插件/技能排行。
 - 按窗口时长归类短窗口和每周窗口；相对重置值换算为本地绝对时间。
 - 结果原子缓存到 `cache/usage.json`；错误只保存在内存/UI，不包含 token。

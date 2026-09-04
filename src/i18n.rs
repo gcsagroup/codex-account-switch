@@ -1099,6 +1099,17 @@ fn strings() -> &'static HashMap<(Language, &'static str), &'static str> {
             m.insert((language, "usage.reset_prefix"), value);
         }
         for (language, value) in [
+            (Language::En, "Resets available"),
+            (Language::ZhCn, "可用重置次数"),
+            (Language::ZhTw, "可用重設次數"),
+            (Language::Ja, "利用可能なリセット回数"),
+            (Language::Ko, "사용 가능한 초기화 횟수"),
+            (Language::Fr, "Réinitialisations disponibles"),
+            (Language::Es, "Reinicios disponibles"),
+        ] {
+            m.insert((language, "usage.reset_credits_available"), value);
+        }
+        for (language, value) in [
             (Language::En, "Reset time unknown"),
             (Language::ZhCn, "重置时间未知"),
             (Language::ZhTw, "重設時間未知"),

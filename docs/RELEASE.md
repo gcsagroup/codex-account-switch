@@ -24,7 +24,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-The current source baseline contains 32 tests. If that number changes, update the status statements in the README and changelog.
+The current source baseline contains 35 tests. If that number changes, update the status statements in the README and changelog.
 
 ## macOS
 

@@ -1398,6 +1398,11 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
                     .map(|s| s.credits_balance.clone())
                     .unwrap_or_default()
                     .into(),
+                reset_credits: format_reset_credits_available(
+                    snap.and_then(|s| s.reset_credits_available),
+                    lang,
+                )
+                .into(),
                 usage_summary: usage_summary.into(),
                 usage_updated: snap
                     .map(|s| {
@@ -1604,6 +1609,10 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
                 .unwrap_or_default()
                 .into(),
         );
+        window.set_current_reset_credits(
+            format_reset_credits_available(snap.and_then(|s| s.reset_credits_available), lang)
+                .into(),
+        );
         window.set_current_token_lifetime(
             snap.and_then(|s| s.token_profile.as_ref())
                 .and_then(|p| p.lifetime_tokens)
@@ -1761,6 +1770,7 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
         window.set_current_primary_reset("—".into());
         window.set_current_secondary_reset("—".into());
         window.set_current_credits(SharedString::new());
+        window.set_current_reset_credits(SharedString::new());
         window.set_current_token_lifetime(SharedString::new());
         window.set_current_token_peak(SharedString::new());
         window.set_current_token_streak(SharedString::new());
@@ -1844,6 +1854,17 @@ fn resolve_detail_alias(
         .filter(|preview| available_aliases.iter().any(|alias| alias == *preview))
         .unwrap_or(active_alias)
         .to_string()
+}
+
+fn format_reset_credits_available(count: Option<i64>, lang: i18n::Language) -> String {
+    count
+        .map(|count| {
+            format!(
+                "{} · {count}",
+                i18n::t(lang, "usage.reset_credits_available")
+            )
+        })
+        .unwrap_or_default()
 }
 
 fn format_tokens_localized(value: i64, lang: i18n::Language) -> String {
@@ -1949,7 +1970,8 @@ fn format_reasoning_effort(value: &str, lang: i18n::Language) -> String {
 
 #[cfg(test)]
 mod detail_preview_tests {
-    use super::resolve_detail_alias;
+    use super::{format_reset_credits_available, resolve_detail_alias};
+    use crate::i18n::Language;
 
     #[test]
     fn valid_preview_alias_controls_detail_panel() {
@@ -1967,5 +1989,18 @@ mod detail_preview_tests {
             resolve_detail_alias(&aliases, "active", Some("removed")),
             "active"
         );
+    }
+
+    #[test]
+    fn reset_credit_label_keeps_zero_visible_and_hides_unknown() {
+        assert_eq!(
+            format_reset_credits_available(Some(0), Language::ZhCn),
+            "可用重置次数 · 0"
+        );
+        assert_eq!(
+            format_reset_credits_available(Some(2), Language::En),
+            "Resets available · 2"
+        );
+        assert_eq!(format_reset_credits_available(None, Language::ZhCn), "");
     }
 }

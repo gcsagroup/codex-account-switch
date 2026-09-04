@@ -25,7 +25,7 @@ Built with **Rust 1.97.1**, **Slint 1.17**, and bundled SQLite. The UI does not 
 
 ### Usage and activity
 
-- Show five-hour and weekly usage windows, percentages, update times, and reset times for each account.
+- Show five-hour and weekly usage windows, percentages, update/reset times, and the available reset credit count for each account.
 - Click an account card to preview its identity, usage, and activity on the left without changing the active account.
 - Show cumulative and peak tokens, current and longest streaks, longest session, and recent activity.
 - Provide a 52-week activity view with daily heatmap, weekly/cumulative trends, fast-mode and reasoning statistics, skill/chat counts, and frequently used plugins or skills.
@@ -121,7 +121,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
 ```
 
-The current baseline is 32 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, and activity parsing.
+The current baseline is 35 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
 
 ## Security and release boundary
 

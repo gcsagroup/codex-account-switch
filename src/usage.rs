@@ -24,6 +24,8 @@ pub struct UsageSnapshot {
     pub primary: UsageWindow,
     pub secondary: UsageWindow,
     pub credits_balance: String,
+    #[serde(default)]
+    pub reset_credits_available: Option<i64>,
     pub token_profile: Option<TokenUsageProfile>,
     pub fetched_at: i64,
     pub error: String,
@@ -94,6 +96,14 @@ struct UsageResponse {
     rate_limit: Option<RateLimit>,
     #[serde(default)]
     credits: Option<Credits>,
+    #[serde(default)]
+    rate_limit_reset_credits: Option<RateLimitResetCreditsSummary>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RateLimitResetCreditsSummary {
+    #[serde(default)]
+    available_count: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -226,6 +236,10 @@ fn snapshot_from_response(alias: &str, parsed: UsageResponse) -> UsageSnapshot {
         primary: short,
         secondary: weekly,
         credits_balance: parsed.credits.and_then(|c| c.balance).unwrap_or_default(),
+        reset_credits_available: parsed
+            .rate_limit_reset_credits
+            .and_then(|credits| credits.available_count)
+            .filter(|count| *count >= 0),
         token_profile: None,
         fetched_at,
         error: String::new(),
@@ -603,7 +617,8 @@ mod tests {
             "primary_window": {"used_percent": 42.5, "limit_window_seconds": 18000, "reset_at": 1780000000},
             "secondary_window": {"used_percent": 18.0, "limit_window_seconds": 604800, "reset_at": 1780500000}
           },
-          "credits": {"balance": "5.00"}
+          "credits": {"balance": "5.00"},
+          "rate_limit_reset_credits": {"available_count": 2}
         }"#;
         let snap = parse_usage_payload_for_test(body, "work").unwrap();
         assert_eq!(snap.plan_type, "pro");
@@ -611,6 +626,42 @@ mod tests {
         assert!((snap.secondary.used_percent - 18.0).abs() < f64::EPSILON);
         assert_eq!(snap.secondary.reset_at, Some(1780500000));
         assert_eq!(snap.credits_balance, "5.00");
+        assert_eq!(snap.reset_credits_available, Some(2));
+    }
+
+    #[test]
+    fn reset_credit_count_distinguishes_zero_from_unavailable() {
+        let zero = parse_usage_payload_for_test(
+            r#"{"rate_limit_reset_credits":{"available_count":0}}"#,
+            "zero",
+        )
+        .unwrap();
+        let missing = parse_usage_payload_for_test("{}", "missing").unwrap();
+        let null =
+            parse_usage_payload_for_test(r#"{"rate_limit_reset_credits":null}"#, "null").unwrap();
+
+        assert_eq!(zero.reset_credits_available, Some(0));
+        assert_eq!(missing.reset_credits_available, None);
+        assert_eq!(null.reset_credits_available, None);
+    }
+
+    #[test]
+    fn usage_snapshot_reads_legacy_cache_without_reset_credit_count() {
+        let snapshot: UsageSnapshot = serde_json::from_str(
+            r#"{
+              "alias": "legacy",
+              "plan_type": "pro",
+              "primary": {"used_percent": 0.0, "reset_at": null, "limit_window_seconds": null},
+              "secondary": {"used_percent": 0.0, "reset_at": null, "limit_window_seconds": null},
+              "credits_balance": "",
+              "token_profile": null,
+              "fetched_at": 1,
+              "error": ""
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(snapshot.reset_credits_available, None);
     }
 
     #[test]

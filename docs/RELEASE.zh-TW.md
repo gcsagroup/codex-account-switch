@@ -24,7 +24,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-目前原始碼基線包含 32 項測試。測試數量變更時，應同步更新 README 和 CHANGELOG 中的狀態說明。
+目前原始碼基線包含 35 項測試。測試數量變更時，應同步更新 README 和 CHANGELOG 中的狀態說明。
 
 ## macOS
 

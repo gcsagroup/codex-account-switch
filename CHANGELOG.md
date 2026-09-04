@@ -10,7 +10,7 @@ This file records user-visible features, compatibility, security, and delivery c
 
 - Local Codex and Claude Desktop profile save, switch, rename, recoverable delete, and restore.
 - Recovery snapshots, transactional rollback, private trash, and Restore Last Deleted.
-- Codex five-hour/weekly usage, percentages, update/reset times, credits, and per-account status.
+- Codex five-hour/weekly usage, percentages, update/reset times, credits, available reset credit counts, and per-account status.
 - Cumulative and peak tokens, current/longest streaks, longest session, recent activity, and a 52-week insight view.
 - Browser authorization, current-profile save, path import, pasted text, and clipboard import.
 - System tray actions for showing the window, refreshing usage, switching, and quitting.
@@ -42,4 +42,4 @@ This file records user-visible features, compatibility, security, and delivery c
 - Pinned Rust `1.97.1`; CI runs formatting, Clippy, tests, and release builds on macOS and Windows.
 - Added macOS packaging/signing/notarization scripts.
 - Added Windows x64 and x86 builds, SHA-256 files, and an x64 compatibility alias.
-- Current automated baseline: 32 tests covering credentials, imports, permissions, recovery, switching, preview, Claude SQLite, usage windows, and activity parsing.
+- Current automated baseline: 35 tests covering credentials, imports, permissions, recovery, switching, preview, Claude SQLite, usage windows, reset credits, and activity parsing.

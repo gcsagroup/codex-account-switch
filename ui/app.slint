@@ -14,6 +14,7 @@ export struct AccountRow {
     primary_available: bool,
     secondary_available: bool,
     credits: string,
+    reset_credits: string,
     usage_summary: string,
     usage_updated: string,
     usage_attention: bool,
@@ -463,6 +464,7 @@ export component MainWindow inherits Window {
     in-out property <string> current-primary-reset: "—";
     in-out property <string> current-secondary-reset: "—";
     in-out property <string> current-credits: "";
+    in-out property <string> current-reset-credits: "";
     in-out property <string> current-token-lifetime: "";
     in-out property <string> current-token-peak: "";
     in-out property <string> current-token-streak: "";
@@ -907,6 +909,14 @@ export component MainWindow inherits Window {
                             vertical-alignment: center;
                         }
                         Rectangle { horizontal-stretch: 1; background: transparent; }
+                    }
+
+                    if current-alias != "" && provider-index == 0 && current-reset-credits != "": Text {
+                        text: current-reset-credits;
+                        font-size: 11px;
+                        font-family: "Menlo";
+                        font-weight: 700;
+                        color: Theme.copper;
                     }
 
                     if current-alias != "": Rectangle { height: 1px; background: Theme.line.with-alpha(0.72); }
@@ -1450,6 +1460,15 @@ export component MainWindow inherits Window {
                                             font-size: 9px;
                                             font-family: "Menlo";
                                             color: Theme.faint;
+                                            vertical-alignment: center;
+                                        }
+                                        if provider-index == 0 && acc.reset_credits != "": Text {
+                                            text: acc.reset_credits;
+                                            height: 18px;
+                                            font-size: 9px;
+                                            font-family: "Menlo";
+                                            font-weight: 700;
+                                            color: Theme.copper;
                                             vertical-alignment: center;
                                         }
                                     }
