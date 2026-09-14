@@ -4,6 +4,12 @@
 
 本文說明目前原始碼中實際存在的建置腳本和發布門檻。本機或 CI 建置成功，不等於已經形成可正式對外發布的簽章產物。
 
+## v1.1.0 預發布（2026-09-15）
+
+提供 macOS 13+ Apple 晶片（arm64）ZIP，組建號 11。採用 Global Cybersecurity Alliance Limited Apple Distribution 簽章，未經 Developer ID 及公證，Gatekeeper 可能拒絕開啟。不包含 Windows 或 Intel Mac 原生套件。
+
+[GitHub 下載](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.1.0)。ZIP 內含 App、LICENSE 及第三方聲明，可用 `shasum -a 256 -c SHA256SUMS.txt` 驗證。官方價格快照核驗於 2026-09-13，不自動更新；估值為情景換算，非帳單。
+
 ## 工具鏈
 
 - 固定 Rust 工具鏈：`1.97.1`（`rust-toolchain.toml`）
@@ -24,7 +30,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-目前原始碼基線包含 35 項測試。測試數量變更時，應同步更新 README 和 CHANGELOG 中的狀態說明。
+目前原始碼基線包含 50 項測試。測試數量變更時，應同步更新 README 和 CHANGELOG 中的狀態說明。
 
 ## macOS
 
@@ -61,7 +67,7 @@ export APPLE_NOTARY_PROFILE='codex-account-switch-notary'
 ./scripts/sign-notarize-macos.sh
 ```
 
-腳本會執行 Hardened Runtime 簽章、嚴格簽章驗證、公證、Staple 和 Gatekeeper 檢查。對外散布前每一步都必須通過。
+腳本會執行 Hardened Runtime 簽章、嚴格簽章驗證、公證、Staple 和 Gatekeeper 檢查。正式穩定版對外散布前每一步都必須通過。測試預發布可附未公證套件，須明確標示簽章類型及 Gatekeeper 限制。
 
 ## Windows
 
@@ -121,4 +127,4 @@ shasum -a 256 -c codex-account-switch-windows-x86.exe.sha256
 
 - macOS App 尚未通過 Developer ID 簽章和 Apple 公證。
 - Windows 執行檔尚未完成程式碼簽章和 x64/x86 實機冒煙測試。
-- 版本 `0.1.0` 尚未發布正式 GitHub Release。
+- `v1.1.0` 為 GitHub 測試預發布，尚非通過上述門檻的穩定版。

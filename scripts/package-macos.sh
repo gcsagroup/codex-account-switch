@@ -3,6 +3,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 VERSION="$(awk -F ' *= *' '/^version = / { gsub(/\"/, "", $2); print $2; exit }' "$ROOT/Cargo.toml")"
+BUILD_NUMBER="$(( $(cat "$ROOT/BUILD_NUMBER") + 1 ))"
+printf '%s\n' "$BUILD_NUMBER" > "$ROOT/BUILD_NUMBER"
 RUSTC_BIN="$(rustup which --toolchain 1.97.1 rustc)"
 (cd "$ROOT" && CARGO_TARGET_DIR="$TARGET_DIR" RUSTC="$RUSTC_BIN" rustup run 1.97.1 cargo build --locked --release)
 
@@ -27,7 +29,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>Codex Account Switch</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleVersion</key><string>$BUILD_NUMBER</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSAppleEventsUsageDescription</key><string>Codex Account Switch uses Apple Events only when you request an app restart after switching accounts.</string>

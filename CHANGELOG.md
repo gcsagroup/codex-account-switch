@@ -2,11 +2,21 @@
 
 [English](CHANGELOG.md) | [简体中文](CHANGELOG.zh-CN.md) | [繁體中文](CHANGELOG.zh-TW.md)
 
-This file records user-visible features, compatibility, security, and delivery changes. The project has no published release yet, so the current implementation is collected under `0.1.0`.
+This changelog records user-facing changes. The first GitHub prerelease is v1.1.0; older development history remains under 0.1.0.
+
+## v1.1.0 - 2026-09-15 (prerelease)
+
+- Inline account details consolidate limits, timestamps, cache and error status.
+- Automatic token API-equivalent estimates from an official price snapshot, model selection, optional advanced ratios, date coverage and daily trends.
+- macOS packaging increments the build number shown in the app and bundle.
+- 50 automated tests; macOS arm64 ZIP with Global Cybersecurity Alliance Limited Apple Distribution signature and SHA-256 checksum. Not notarized; no Windows binaries in this release.
 
 ## 0.1.0 - Unreleased
 
 ### Added
+
+- Added account/analytics navigation, collapsed import and More actions, and live 7/30-day usage, product, plugin, and skill analytics.
+- Enabled system proxy support for the reproduced 403 issue; failed refreshes preserve success timestamps and report per-panel errors.
 
 - Local Codex and Claude Desktop profile save, switch, rename, recoverable delete, and restore.
 - Recovery snapshots, transactional rollback, private trash, and Restore Last Deleted.
@@ -42,4 +52,4 @@ This file records user-visible features, compatibility, security, and delivery c
 - Pinned Rust `1.97.1`; CI runs formatting, Clippy, tests, and release builds on macOS and Windows.
 - Added macOS packaging/signing/notarization scripts.
 - Added Windows x64 and x86 builds, SHA-256 files, and an x64 compatibility alias.
-- Current automated baseline: 35 tests covering credentials, imports, permissions, recovery, switching, preview, Claude SQLite, usage windows, reset credits, and activity parsing.
+- Historical automated baseline: 35 tests covering credentials, imports, permissions, recovery, switching, preview, Claude SQLite, usage windows, reset credits, and activity parsing.

@@ -27,6 +27,9 @@ Slint 視窗 / 系統匣
 - `src/profile.rs`：Codex Profile、別名驗證、原子寫入、權限、回收與復原。
 - `src/switcher.rs`：儲存/接管/切換、token 回寫、快照與回復。
 - `src/login.rs`：啟動/取消 `codex login`、偵測 live 檔案變更與登入逾時。
+- `src/analytics.rs`：四類唯讀分析介面與 Token 活動介面、日期篩選與統計彙總。
+- `src/valuation.rs`：Token 日期覆蓋、情景估值驗證與依真實帳號儲存的假設；不從輪次推斷 Token 類型。
+- `src/analysis_ui.rs`：帳號／日期隔離快取、非同步結果驗證及分析畫面模型。
 - `src/usage.rs`：額度/活動請求、視窗分類、重設時間、快取與格式化。
 - `src/claude.rs`：Claude Cookies Profile、SQLite 備份/驗證、切換、重新啟動、回收與復原。
 - `src/restart.rs`：在 macOS/Windows 結束並重新啟動 ChatGPT/Codex 桌面應用程式。

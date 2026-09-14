@@ -4,6 +4,12 @@
 
 This guide describes the build scripts and release gates that exist in the current source tree. A successful local or CI build is not, by itself, a signed and supported public release.
 
+## v1.1.0 prerelease (2026-09-15)
+
+macOS 13+ Apple silicon (arm64), build 11. Signed with Apple Distribution: Global Cybersecurity Alliance Limited; not Developer ID signed or notarized. Gatekeeper may reject it. No Windows or native Intel Mac binaries are included.
+
+[GitHub download](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.1.0). The ZIP contains the App, LICENSE and third-party notices. Verify with `shasum -a 256 -c SHA256SUMS.txt`. Official prices are a snapshot verified on 2026-09-13, not automatically refreshed. Values are scenario estimates, not bills.
+
 ## Toolchain
 
 - Pinned Rust toolchain: `1.97.1` (`rust-toolchain.toml`)
@@ -24,7 +30,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-The current source baseline contains 35 tests. If that number changes, update the status statements in the README and changelog.
+The current source baseline contains 50 tests. If that number changes, update the status statements in the README and changelog.
 
 ## macOS
 
@@ -61,7 +67,7 @@ export APPLE_NOTARY_PROFILE='codex-account-switch-notary'
 ./scripts/sign-notarize-macos.sh
 ```
 
-The script performs hardened-runtime signing, strict signature verification, notarization, stapling, and Gatekeeper assessment. Every step must pass before external distribution.
+The script performs hardened-runtime signing, strict signature verification, notarization, stapling, and Gatekeeper assessment. Every step must pass for a stable distribution. Testing prereleases may include an unnotarized package with its signing type and Gatekeeper limitation clearly disclosed.
 
 ## Windows
 

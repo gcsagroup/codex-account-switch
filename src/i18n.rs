@@ -1269,6 +1269,76 @@ fn strings() -> &'static HashMap<(Language, &'static str), &'static str> {
             }
         }
 
+        // 改版导航、分析面板和明确的缓存状态。
+        let redesign = [
+            ("val.title", ["Token and equivalent value", "Token 与等价价值", "Token 與等價價值", "Token と換算額", "Token 및 환산 가치", "Tokens et valeur équivalente", "Tokens y valor equivalente"]),
+            ("val.tokens", ["Tokens in returned dates", "已返回日期 Token 合计", "已回傳日期 Token 合計", "取得済み日付の Token 合計", "반환된 날짜 Token 합계", "Tokens des dates reçues", "Tokens de fechas recibidas"]),
+            ("val.value", ["API equivalent · scenario estimate", "API 等价价值 · 假设估值", "API 等價價值 · 假設估值", "API 換算額 · 仮定の推計", "API 환산 · 가정 추정치", "Équivalent API · estimation", "Equivalente API · estimación"]),
+            ("val.configure", ["Advanced ratios", "高级：估算比例", "進階：估算比例", "詳細：推定比率", "고급: 추정 비율", "Ratios avancés", "Proporciones avanzadas"]),
+            ("val.model", ["Reference model / pricing scenario", "参考模型／计价方案", "參考模型／計價方案", "参考モデル・料金設定", "참조 모델 / 요금 시나리오", "Modèle / scénario tarifaire", "Modelo / escenario de precios"]),
+            ("val.custom", ["Official Standard · short context", "官方标准价 · 短上下文", "官方標準價 · 短上下文", "公式標準料金 · 短文脈", "공식 표준 요금 · 짧은 문맥", "Tarif officiel Standard · contexte court", "Precio oficial Standard · contexto corto"]),
+            ("val.input_ratio", ["Input share of total", "输入占总量", "輸入占總量", "入力の割合", "전체 입력 비율", "Part d’entrée", "Proporción de entrada"]),
+            ("val.cache_ratio", ["Cached share of input", "缓存占输入", "快取占輸入", "入力のキャッシュ割合", "입력 중 캐시 비율", "Part en cache de l’entrée", "Proporción de entrada en caché"]),
+            ("val.input_price", ["Input · USD / million", "普通输入 · USD／百万", "一般輸入 · USD／百萬", "通常入力 · USD/百万", "일반 입력 · USD/백만", "Entrée · USD / million", "Entrada · USD / millón"]),
+            ("val.cache_price", ["Cached input · USD / million", "缓存输入 · USD／百万", "快取輸入 · USD／百萬", "キャッシュ入力 · USD/百万", "캐시 입력 · USD/백만", "Entrée en cache · USD / million", "Entrada en caché · USD / millón"]),
+            ("val.output_price", ["Output · USD / million", "输出 · USD／百万", "輸出 · USD／百萬", "出力 · USD/百万", "출력 · USD/백만", "Sortie · USD / million", "Salida · USD / millón"]),
+            ("val.price_date", ["Price snapshot verified", "价格快照核验于", "價格快照核驗於", "価格確認日", "가격 확인일", "Prix vérifiés le", "Precios verificados el"]),
+            ("val.apply", ["Save and apply", "保存并应用", "儲存並套用", "保存して適用", "저장 및 적용", "Enregistrer et appliquer", "Guardar y aplicar"]),
+            ("val.cancel", ["Cancel", "取消", "取消", "キャンセル", "취소", "Annuler", "Cancelar"]),
+            ("val.trend", ["Daily trend", "每日趋势", "每日趨勢", "日別推移", "일별 추이", "Tendance quotidienne", "Tendencia diaria"]),
+            ("val.token_mode", ["Token", "Token", "Token", "Token", "Token", "Token", "Token"]),
+            ("val.cost_mode", ["Equivalent value (USD)", "等价价值（USD）", "等價價值（USD）", "換算額（USD）", "환산 가치 (USD)", "Valeur équivalente (USD)", "Valor equivalente (USD)"]),
+            ("val.scope", ["Estimates returned dates only, not bills or savings; excludes cache writes, long-context, fast-mode and tool surcharges.", "按已返回日期估算，不代表账单或节省金额；未含缓存写入、长上下文、快速模式及工具等附加费用。", "依已回傳日期估算，非帳單或節省金額；不含快取寫入、長上下文、快速模式及工具等附加費用。", "取得済みの日付のみの推計。請求額ではなく、キャッシュ書込・長文・高速モード・ツール追加料金は含みません。", "반환된 날짜만 추정. 청구액이 아니며 캐시 쓰기, 긴 문맥, 빠른 모드, 도구 추가 비용 제외.", "Estimation des dates reçues, sans frais de cache, contexte long, mode rapide ni outils ; ce n’est pas une facture.", "Estimación de fechas recibidas; no es factura ni ahorro. Excluye escritura de caché, contexto largo, modo rápido y herramientas."]),
+            ("val.source", ["Official pricing reference", "官方计价参考", "官方計價參考", "公式料金の参考", "공식 요금 참고", "Référence tarifaire officielle", "Referencia oficial de precios"]),
+            ("val.hint", ["The account API returns total tokens only. Default scenario: 80% input, 50% cached input; output is the remainder. Adjust optionally. Prices load automatically from the official snapshot.", "账号接口只有 Token 总量。默认估算：输入占 80%，其中缓存占 50%，其余为输出；可按需调整。单价自动使用官方价格快照。", "帳號介面僅有 Token 總量。預設估算：輸入佔 80%，其中快取佔 50%，其餘為輸出；可選調整。單價自動使用官方價格快照。", "API は総 Token のみ。既定の仮定：入力80%、そのうちキャッシュ50%、残りは出力。任意で調整。単価は公式価格から自動設定。", "API는 총 Token만 반환. 기본 가정: 입력 80%, 그중 캐시 50%, 나머지 출력. 선택적으로 조정. 공식 가격 자동 적용.", "API : tokens totaux uniquement. Hypothèses : entrée 80 %, dont cache 50 %, reste en sortie. Ajustement facultatif. Tarifs officiels automatiques.", "La API solo devuelve tokens totales. Supuesto: entrada 80 %, caché 50 % de entrada; resto salida. Ajuste opcional. Precios oficiales automáticos."]),
+            ("val.storage_error", ["Cannot read or save valuation.json; original file preserved.", "估值设置无法读取或保存，请检查 valuation.json；原文件保留。", "無法讀取或儲存 valuation.json；保留原檔。", "valuation.json を読み書きできません。元のファイルは保持。", "valuation.json 읽기/저장 실패. 원본 유지.", "Lecture ou écriture de valuation.json impossible ; original conservé.", "No se puede leer o guardar valuation.json; original conservado."]),
+            ("val.invalid", ["Ratios must be between 0 and 100%.", "估算比例必须在 0–100% 之间。", "估算比例必須介於 0–100%。", "比率は0〜100%。", "비율은 0~100%.", "Ratios entre 0 et 100 %.", "Proporciones entre 0 y 100 %."]),
+            ("val.unset", ["Set assumptions to estimate", "待设置估值假设", "待設定估值假設", "仮定の設定が必要", "추정 가정 설정 필요", "Définissez les hypothèses", "Define los supuestos"]),
+            ("val.coverage", ["Returned {n}/{days} days; missing dates excluded, today may be incomplete.", "已返回 {n}/{days} 天；缺失日期不计入合计，今日可能未完整。", "已回傳 {n}/{days} 天；缺失日期不計入，今日可能未完整。", "{n}/{days} 日取得。未取得日は除外、本日は未完了の可能性。", "{n}/{days}일 반환. 누락 날짜 제외, 오늘은 불완전할 수 있음.", "{n}/{days} jours reçus ; dates absentes exclues, jour courant possiblement incomplet.", "{n}/{days} días recibidos; faltantes excluidos, hoy puede estar incompleto."]),
+            ("val.missing", ["Date missing or invalid", "日期未返回或数据无效", "日期未回傳或資料無效", "日付未取得または無効", "날짜 누락 또는 무효", "Date absente ou invalide", "Fecha ausente o inválida"]),
+            ("val.rates", ["Input / cache / output (USD / million)", "输入／缓存／输出单价（USD／百万）", "輸入／快取／輸出單價（USD／百萬）", "入力・キャッシュ・出力（USD/百万）", "입력 / 캐시 / 출력 (USD/백만)", "Entrée / cache / sortie (USD / million)", "Entrada / caché / salida (USD / millón)"]),
+
+            ("new.weekly_used", ["Weekly used", "每周已用", "每週已用", "週間使用量", "주간 사용량", "Utilisation hebdomadaire", "Uso semanal"]),
+            ("new.nav_accounts", ["Accounts", "账号管理", "帳號管理", "アカウント", "계정 관리", "Comptes", "Cuentas"]),
+            ("new.nav_analysis", ["Analytics", "分析", "分析", "分析", "분석", "Analyse", "Análisis"]),
+            ("new.network", ["Connection", "连接状态", "連線狀態", "接続状態", "연결 상태", "Connexion", "Conexión"]),
+            ("new.network_hint", ["Uses the system proxy and proxy environment variables. Adjust network settings in your system, then retry.", "跟随系统代理，也支持代理环境变量。请在系统设置中调整网络后重试。", "跟隨系統代理，也支援代理環境變數。請在系統設定中調整網路後重試。", "システムプロキシと環境変数を使用します。ネットワーク設定を確認して再試行してください。", "시스템 프록시와 환경 변수를 사용합니다. 네트워크 설정 확인 후 다시 시도하세요.", "Utilise le proxy système et les variables de proxy. Vérifiez le réseau puis réessayez.", "Usa el proxy del sistema y las variables de proxy. Revise la red y reintente."]),
+            ("new.add_account", ["＋ Add account", "＋ 添加账号", "＋ 新增帳號", "＋ 追加", "＋ 계정 추가", "＋ Ajouter", "＋ Añadir"]),
+            ("new.cached", ["Cached", "缓存", "快取", "キャッシュ", "캐시", "En cache", "En caché"]),
+            ("new.more", ["More", "更多", "更多", "その他", "더 보기", "Plus", "Más"]),
+            ("new.loading", ["Updating…", "更新中…", "更新中…", "更新中…", "업데이트 중…", "Actualisation…", "Actualizando…"]),
+            ("new.days", ["days", "天", "天", "日", "일", "jours", "días"]),
+            ("new.plan_usage", ["Plan usage", "套餐用量", "方案用量", "プラン使用量", "플랜 사용량", "Utilisation du forfait", "Uso del plan"]),
+            ("new.by_product", ["By product", "按产品", "按產品", "製品別", "제품별", "Par produit", "Por producto"]),
+            ("new.by_model", ["By model", "按模型", "按模型", "モデル別", "모델별", "Par modèle", "Por modelo"]),
+            ("new.by_client", ["By client", "按使用端", "按用戶端", "クライアント別", "클라이언트별", "Par client", "Por cliente"]),
+            ("new.product_activity", ["Product activity", "产品活动", "產品活動", "製品の利用", "제품 활동", "Activité produit", "Actividad del producto"]),
+            ("new.tool_activity", ["Tool activity", "工具活动", "工具活動", "ツールの利用", "도구 활동", "Activité des outils", "Actividad de herramientas"]),
+            ("new.turns", ["Turns", "轮次", "輪次", "ターン", "턴", "Tours", "Turnos"]),
+            ("new.returned_total", ["Returned items total", "已返回项目合计", "已回傳項目合計", "取得項目の合計", "반환 항목 합계", "Total des éléments reçus", "Total de elementos recibidos"]),
+            ("new.plugins", ["Plugins", "插件", "外掛", "プラグイン", "플러그인", "Plugins", "Plugins"]),
+            ("new.skills", ["Skills", "技能", "技能", "スキル", "스킬", "Compétences", "Habilidades"]),
+            ("new.analysis_delay", ["Approximate usage; may lag by 6 hours. Daily usage is separate from the current rate-limit window.", "用量为近似值，最多可能延迟 6 小时。每日用量不等于当前窗口的已用比例。", "用量為近似值，最多可能延遲 6 小時。每日用量不等於目前視窗的已用比例。", "使用量は概算で最大6時間遅延します。日別使用量は現在の上限枠とは別です。", "사용량은 근사치이며 최대 6시간 지연될 수 있습니다. 일일 사용량은 현재 한도와 별개입니다.", "Usage approximatif, retard possible de 6 h. Les valeurs quotidiennes sont distinctes du quota actuel.", "Uso aproximado, con hasta 6 h de retraso. El uso diario es independiente de la cuota actual."]),
+            ("new.analysis_source", ["Account statistics · Tool rankings aggregate returned daily items. Token activity is separate.", "官方账号统计 · 工具榜单为每日返回项目汇总；Token 活动独立展示。", "官方帳號統計 · 工具榜單為每日回傳項目彙總；Token 活動獨立顯示。", "アカウント統計 · ツールは日別取得項目の集計です。トークン利用は別に表示します。", "계정 통계 · 도구 순위는 일별 반환 항목의 합계입니다. 토큰 활동은 별도로 표시됩니다.", "Statistiques du compte · Classement des outils reçus par jour. Tokens présentés séparément.", "Estadísticas de cuenta · Herramientas devueltas por día. Los tokens se muestran por separado."]),
+            ("new.cached_warning", ["Refresh failed · showing last successful data", "刷新失败 · 显示上次成功数据", "更新失敗 · 顯示上次成功資料", "更新失敗 · 前回のデータを表示", "새로 고침 실패 · 이전 데이터 표시", "Échec · dernières données disponibles", "Error · mostrando datos anteriores"]),
+            ("new.last_success", ["Last success", "上次成功", "上次成功", "最終成功", "마지막 성공", "Dernier succès", "Último éxito"]),
+            ("new.last_attempt", ["Last attempt", "最近尝试", "最近嘗試", "最終試行", "최근 시도", "Dernière tentative", "Último intento"]),
+            ("new.unit_percent", ["Plan usage (%)", "套餐用量（%）", "方案用量（%）", "プラン使用量（%）", "플랜 사용량 (%)", "Utilisation du forfait (%)", "Uso del plan (%)"]),
+            ("new.no_activity", ["No activity in this period", "该时段暂无活动", "該時段暫無活動", "この期間の利用なし", "이 기간에 활동 없음", "Aucune activité sur cette période", "Sin actividad en este período"]),
+            ("new.no_data", ["Not loaded", "尚未加载", "尚未載入", "未読み込み", "아직 로드되지 않음", "Non chargé", "Sin cargar"]),
+            ("new.data_updated", ["Data updated", "数据更新", "資料更新", "データ更新", "데이터 업데이트", "Données actualisées", "Datos actualizados"]),
+            ("new.top_plugins", ["Daily top 8 aggregated", "每日前 8 项汇总", "每日前 8 項彙總", "日別上位8件の集計", "일별 상위 8개 합계", "Top 8 quotidien agrégé", "Top 8 diario agregado"]),
+            ("new.top_skills", ["Daily top 6 aggregated", "每日前 6 项汇总", "每日前 6 項彙總", "日別上位6件の集計", "일별 상위 6개 합계", "Top 6 quotidien agrégé", "Top 6 diario agregado"]),
+            ("new.other", ["Other", "其他", "其他", "その他", "기타", "Autres", "Otros"]),
+            ("status.refresh_result", ["Accounts refreshed", "账号额度更新成功", "帳號額度更新成功", "更新したアカウント", "새로 고친 계정", "Comptes actualisés", "Cuentas actualizadas"]),
+            ("status.activity_failed", ["Activity failures", "活动更新失败", "活動更新失敗", "利用状況の更新失敗", "활동 업데이트 실패", "Échecs d’activité", "Errores de actividad"]),
+        ];
+        for (key, values) in redesign {
+            for (language, value) in [Language::En, Language::ZhCn, Language::ZhTw, Language::Ja, Language::Ko, Language::Fr, Language::Es].into_iter().zip(values) {
+                m.insert((language, key), value);
+            }
+        }
+
         m
     })
 }

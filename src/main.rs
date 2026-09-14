@@ -1,5 +1,7 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+mod analysis_ui;
+mod analytics;
 mod claude;
 mod error;
 mod identity;
@@ -9,6 +11,7 @@ mod profile;
 mod restart;
 mod switcher;
 mod usage;
+mod valuation;
 
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -48,6 +51,7 @@ struct AppShared {
     usage: HashMap<String, UsageSnapshot>,
     usage_refreshing: Arc<AtomicBool>,
     lang: i18n::Language,
+    analysis: analysis_ui::State,
 }
 
 impl AppShared {
@@ -159,11 +163,15 @@ fn run_app() -> Result<(), Box<dyn std::error::Error>> {
         usage,
         usage_refreshing: Arc::new(AtomicBool::new(false)),
         lang,
+        analysis: analysis_ui::State::default(),
     }));
     let running = Arc::new(AtomicBool::new(true));
 
     let window = MainWindow::new()?;
+    window
+        .set_app_version(concat!("Ver ", env!("APP_VERSION"), " (", env!("APP_BUILD"), ")").into());
     let tray = AppTray::new()?;
+    analysis_ui::connect(&window, Arc::clone(&shared));
 
     // Set initial language index in UI
     window.set_lang_index(match lang {
@@ -1214,6 +1222,11 @@ fn spawn_usage_refresh(
     {
         return;
     }
+    if let Some(window) = window_weak.upgrade() {
+        window.set_usage_busy(true);
+        let lang = shared.lock().unwrap().lang;
+        window.set_status_text(i18n::t(lang, "new.loading").into());
+    }
     thread::spawn(move || {
         let _refresh_guard = UsageRefreshGuard(refresh_flag);
         let (lang, provider) = {
@@ -1224,6 +1237,7 @@ fn spawn_usage_refresh(
             let _ = slint::invoke_from_event_loop(move || {
                 if let (Some(w), Some(t)) = (window_weak.upgrade(), tray_weak.upgrade()) {
                     refresh_ui(&w, &t, &shared);
+                    w.set_usage_busy(false);
                 }
             });
             return;
@@ -1273,31 +1287,36 @@ fn spawn_usage_refresh(
                         }
                         (Ok(mut s), Err(error)) => {
                             s.token_profile = previous_token_profile;
+                            s.activity_error = error.to_string();
                             let _ = append_log(&format!(
                                 "token activity refresh failed for {alias}: {error}"
                             ));
                             s
                         }
-                        (Err(e), _) => {
-                            let mut failed = previous.unwrap_or_default();
-                            failed.alias = alias.clone();
-                            failed.error = e.to_string();
-                            failed.fetched_at = chrono::Utc::now().timestamp();
-                            failed
-                        }
+                        (Err(e), _) => usage::failed_snapshot(
+                            previous,
+                            &alias,
+                            e.to_string(),
+                            chrono::Utc::now().timestamp(),
+                        ),
                     }
                 }
-                _ => {
-                    let mut failed = previous.unwrap_or_default();
-                    failed.alias = alias.clone();
-                    failed.error = i18n::t(lang, "status.no_token").into();
-                    failed.fetched_at = chrono::Utc::now().timestamp();
-                    failed
-                }
+                _ => usage::failed_snapshot(
+                    previous,
+                    &alias,
+                    i18n::t(lang, "status.no_token").into(),
+                    chrono::Utc::now().timestamp(),
+                ),
             };
             updates.push(snap);
         }
 
+        let total = updates.len();
+        let successes = updates.iter().filter(|s| s.error.is_empty()).count();
+        let activity_failures = updates
+            .iter()
+            .filter(|s| !s.activity_error.is_empty())
+            .count();
         {
             let mut state = shared.lock().unwrap();
             let valid_aliases: HashSet<String> = state
@@ -1320,7 +1339,22 @@ fn spawn_usage_refresh(
             let lang = shared.lock().unwrap().lang;
             if let (Some(w), Some(t)) = (window_weak.upgrade(), tray_weak.upgrade()) {
                 refresh_ui(&w, &t, &shared);
-                w.set_status_text(i18n::t(lang, "status.usage_updated").into());
+                w.set_usage_busy(false);
+                w.set_status_text(
+                    format!(
+                        "{} {successes}/{total}{}",
+                        i18n::t(lang, "status.refresh_result"),
+                        if activity_failures > 0 {
+                            format!(
+                                " · {} {activity_failures}",
+                                i18n::t(lang, "status.activity_failed")
+                            )
+                        } else {
+                            String::new()
+                        }
+                    )
+                    .into(),
+                );
             }
         });
     });
@@ -1331,6 +1365,14 @@ struct UsageRefreshGuard(Arc<AtomicBool>);
 impl Drop for UsageRefreshGuard {
     fn drop(&mut self) {
         self.0.store(false, Ordering::SeqCst);
+    }
+}
+
+fn usage_success_time(snapshot: &UsageSnapshot) -> String {
+    if snapshot.fetched_at <= 0 || (snapshot.last_attempted_at == 0 && !snapshot.error.is_empty()) {
+        "—".into()
+    } else {
+        format_reset(Some(snapshot.fetched_at))
     }
 }
 
@@ -1356,6 +1398,29 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
     window.set_active_alias(active_alias.clone().into());
     let supports_usage = state.provider == Provider::Codex;
     let now = chrono::Utc::now().timestamp();
+    let failed = profiles
+        .iter()
+        .filter(|p| {
+            state
+                .usage
+                .get(&p.alias)
+                .is_some_and(|s| !s.error.is_empty())
+        })
+        .count();
+    window.set_usage_notice(if supports_usage && failed > 0 {
+        format!(
+            "{} ({failed}/{})",
+            i18n::t(lang, "new.cached_warning"),
+            profiles.len()
+        )
+        .into()
+    } else {
+        SharedString::new()
+    });
+    window.set_current_stale(false);
+    window.set_current_activity_error(SharedString::new());
+    window.set_current_usage_stamp(SharedString::new());
+    analysis_ui::localize(window, lang);
 
     let rows: Vec<AccountRow> = profiles
         .iter()
@@ -1409,7 +1474,7 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
                         format!(
                             "{} {}",
                             i18n::t(lang, "usage.updated_prefix"),
-                            format_reset(Some(s.fetched_at))
+                            usage_success_time(s)
                         )
                     })
                     .unwrap_or_default()
@@ -1421,8 +1486,6 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
                         let e = e.trim();
                         if e.is_empty() {
                             String::new()
-                        } else if e.chars().count() > 36 {
-                            e.chars().take(36).collect::<String>() + "…"
                         } else {
                             e.to_string()
                         }
@@ -1542,6 +1605,37 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
         let snap = supports_usage
             .then(|| state.usage.get(&current.alias))
             .flatten();
+        window.set_current_stale(snap.is_some_and(|s| !s.error.is_empty()));
+        window.set_current_activity_error(
+            snap.map(|s| {
+                if s.error.is_empty() {
+                    s.activity_error.clone()
+                } else {
+                    s.error.clone()
+                }
+            })
+            .unwrap_or_default()
+            .into(),
+        );
+        window.set_current_usage_stamp(
+            snap.map(|s| {
+                let mut text = format!(
+                    "{} {}",
+                    i18n::t(lang, "new.last_success"),
+                    usage_success_time(s)
+                );
+                if !s.error.is_empty() && s.last_attempted_at > 0 {
+                    text.push_str(&format!(
+                        " · {} {}",
+                        i18n::t(lang, "new.last_attempt"),
+                        format_reset(Some(s.last_attempted_at))
+                    ));
+                }
+                text
+            })
+            .unwrap_or_default()
+            .into(),
+        );
         window.set_current_alias(current.alias.clone().into());
         window.set_current_email(current.identity.email.clone().into());
         window.set_current_plan(
@@ -1792,6 +1886,8 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
         window.set_current_primary_available(false);
         window.set_current_secondary_available(false);
     }
+
+    analysis_ui::render_locked(window, &state);
 
     if let Some(active) = profiles
         .iter()

@@ -28,6 +28,10 @@ pub struct UsageSnapshot {
     pub reset_credits_available: Option<i64>,
     pub token_profile: Option<TokenUsageProfile>,
     pub fetched_at: i64,
+    #[serde(default)]
+    pub last_attempted_at: i64,
+    #[serde(default)]
+    pub activity_error: String,
     pub error: String,
 }
 
@@ -153,6 +157,23 @@ pub fn save_cache(snapshots: &HashMap<String, UsageSnapshot>) -> AppResult<()> {
     Ok(())
 }
 
+/// 失败只更新尝试时间；旧版本失败缓存的成功时间无法确认，显示为未知。
+pub fn failed_snapshot(
+    previous: Option<UsageSnapshot>,
+    alias: &str,
+    error: String,
+    now: i64,
+) -> UsageSnapshot {
+    let mut snapshot = previous.unwrap_or_default();
+    if snapshot.last_attempted_at == 0 && !snapshot.error.is_empty() {
+        snapshot.fetched_at = 0;
+    }
+    snapshot.alias = alias.into();
+    snapshot.error = error;
+    snapshot.last_attempted_at = now;
+    snapshot
+}
+
 pub fn fetch_usage(alias: &str, access_token: &str, account_id: &str) -> AppResult<UsageSnapshot> {
     if access_token.is_empty() || account_id.is_empty() {
         return Ok(UsageSnapshot {
@@ -163,10 +184,7 @@ pub fn fetch_usage(alias: &str, access_token: &str, account_id: &str) -> AppResu
         });
     }
 
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(20))
-        .user_agent("codex-account-switch/0.1")
-        .build()?;
+    let client = http_client()?;
 
     let response = client
         .get(USAGE_URL)
@@ -184,7 +202,14 @@ pub fn fetch_usage(alias: &str, access_token: &str, account_id: &str) -> AppResu
     Ok(snapshot_from_response(alias, parsed))
 }
 
-fn friendly_http_error(status: u16, body: &str) -> String {
+pub fn http_client() -> AppResult<reqwest::blocking::Client> {
+    Ok(reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .user_agent("codex-account-switch/0.1")
+        .build()?)
+}
+
+pub fn friendly_http_error(status: u16, body: &str) -> String {
     let lower = body.to_ascii_lowercase();
     if status == 401
         || lower.contains("token_expired")
@@ -194,7 +219,11 @@ fn friendly_http_error(status: u16, body: &str) -> String {
         return "登录已过期，请重新导入该账号的 auth.json".into();
     }
     if status == 403 {
-        return "无权限查询额度（403）".into();
+        return if lower.contains("<html") || lower.contains("<!doctype html") {
+            "连接被拒绝（403），请检查系统代理与网络后重试".into()
+        } else {
+            "服务拒绝访问（403），请检查账号授权后重试".into()
+        };
     }
     if status == 429 {
         return "查询过于频繁，请稍后再试".into();
@@ -242,6 +271,8 @@ fn snapshot_from_response(alias: &str, parsed: UsageResponse) -> UsageSnapshot {
             .filter(|count| *count >= 0),
         token_profile: None,
         fetched_at,
+        last_attempted_at: fetched_at,
+        activity_error: String::new(),
         error: String::new(),
     }
 }
@@ -385,10 +416,7 @@ pub fn fetch_token_usage_profile(
         return Ok(TokenUsageProfile::default());
     }
 
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(20))
-        .user_agent("codex-account-switch/0.1")
-        .build()?;
+    let client = http_client()?;
 
     let url = "https://chatgpt.com/backend-api/wham/profiles/me";
     let response = client
@@ -603,6 +631,45 @@ fn truncate(s: &str, max: usize) -> String {
 pub fn parse_usage_payload_for_test(body: &str, alias: &str) -> AppResult<UsageSnapshot> {
     let parsed: UsageResponse = serde_json::from_str(body)?;
     Ok(snapshot_from_response(alias, parsed))
+}
+
+#[cfg(test)]
+mod refresh_failure_tests {
+    use super::*;
+
+    #[test]
+    fn failed_refresh_does_not_claim_new_success_or_erase_quota() {
+        let old = UsageSnapshot {
+            alias: "a".into(),
+            fetched_at: 100,
+            last_attempted_at: 100,
+            secondary: UsageWindow {
+                used_percent: 69.,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let failed = failed_snapshot(Some(old), "a", "403".into(), 200);
+        assert_eq!(failed.fetched_at, 100);
+        assert_eq!(failed.last_attempted_at, 200);
+        assert_eq!(failed.secondary.used_percent, 69.);
+    }
+
+    #[test]
+    fn legacy_failed_timestamp_is_unknown_and_403_is_classified() {
+        let old = UsageSnapshot {
+            error: "403".into(),
+            fetched_at: 100,
+            ..Default::default()
+        };
+        assert_eq!(
+            failed_snapshot(Some(old), "a", "403".into(), 200).fetched_at,
+            0
+        );
+        assert!(friendly_http_error(403, "<html>blocked</html>").contains("代理"));
+        assert!(friendly_http_error(403, r#"{"error":"forbidden"}"#).contains("授权"));
+        assert!(friendly_http_error(403, r#"{"error":"token_expired"}"#).contains("过期"));
+    }
 }
 
 #[cfg(test)]

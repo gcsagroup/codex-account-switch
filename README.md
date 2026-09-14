@@ -8,10 +8,20 @@ Built with **Rust 1.97.1**, **Slint 1.17**, and bundled SQLite. The UI does not 
 
 ## Project status
 
-- Version: `0.1.0`, unreleased.
-- macOS: local arm64 App build and real-window validation completed; unsigned and not notarized.
-- Windows: x64 and x86 artifacts build successfully and pass PE, SHA-256, and runtime-import checks; real Windows smoke testing is still required.
+- Version: [`v1.1.0` prerelease](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.1.0), 2026-09-15.
+- macOS: local arm64 App build and real-window validation completed; signed locally with Apple Distribution: Global Cybersecurity Alliance Limited; not Developer ID signed or notarized. This is a testing prerelease; Gatekeeper may reject it.
+- Windows: no binaries are included in this release; native end-to-end acceptance remains pending. CI build results do not replace real-device testing.
 - Linux: not currently supported or release-tested.
+
+### Inline account details and token valuation (Ver 1.1)
+
+- Click an account row to expand or collapse details in place. Only one account is expanded; this neither scrolls to the top nor switches the active login. Limits, reset credits, balance, cache timestamps and errors stay inside that account card.
+- Analytics totals the returned daily token buckets within 7/30 days and shows coverage. Missing/invalid dates remain unknown; today may be incomplete.
+- Analytics automatically estimates API equivalent value using an official price snapshot. GPT-5.6 Sol is the default reference; choose another model from the dropdown. Prices and verification date require no manual entry.
+- Default scenario: 80% input, of which 50% is cached; adjust optionally under Advanced ratios. The account API provides total tokens, not actual token-type splits. Uses [official Standard short-context prices](https://developers.openai.com/api/docs/pricing); excludes surcharges and is not a bill or savings calculation.
+- Assumptions persist per real account in `~/.codex-switch/valuation.json` (or `CODEX_SWITCH_HOME`). Analytics data remains an in-memory cache isolated by account and date range.
+- Use `dist/Codex Account Switch.app` for macOS builds and acceptance. Packaging increments `BUILD_NUMBER`, shared by the visible and bundle versions; increment it before direct compilation too.
+
 
 ## Features
 
@@ -26,10 +36,18 @@ Built with **Rust 1.97.1**, **Slint 1.17**, and bundled SQLite. The UI does not 
 ### Usage and activity
 
 - Show five-hour and weekly usage windows, percentages, update/reset times, and the available reset credit count for each account.
-- Click an account card to preview its identity, usage, and activity on the left without changing the active account.
+- Click an account row to preview its details identity and usage without changing the active account.
 - Show cumulative and peak tokens, current and longest streaks, longest session, and recent activity.
 - Provide a 52-week activity view with daily heatmap, weekly/cumulative trends, fast-mode and reasoning statistics, skill/chat counts, and frequently used plugins or skills.
 - Keep the last successful activity snapshot when the activity endpoint temporarily fails.
+
+### Navigation and analytics
+
+- Accounts holds quota details; Add account expands login/import, and More contains detail, analytics, restart, rename, and delete actions.
+- Analytics shows 7/30-day plan usage by product/model, turns by model/client, and plugin/skill activity for the previewed account. Viewing analytics does not switch the active account.
+- Token activity has a separate entry. Analytics caches are memory-only and isolated by account identity and date range, with independent error states.
+- Connection explains system proxy support. Failed quota refreshes retain the last success time and show the actual success count.
+- Tool totals aggregate the daily top 8 plugins or top 6 skills returned by the service, rather than a complete audit. Plan usage follows server units and is separate from current weekly quota.
 
 ### Claude Desktop accounts
 
@@ -87,9 +105,9 @@ Outputs:
 
 ## Basic workflow
 
-1. Select **Codex** or **Claude Desktop** in the header.
+1. Select **Accounts**, **Analysis**, or **Claude Desktop** in the sidebar.
 2. Add an account through browser login, Save Current, path import, or pasted text.
-3. Click a card to preview it. Use **Switch** or **Restart** only when you want to activate it.
+3. Click an account row to preview its details. Use **Switch** or **Restart** only to activate an account.
 4. Deleted profiles move to the private application trash; use Restore Last Deleted to undo the latest deletion.
 5. A Codex **Switch** requires a manual client restart; **Restart** handles it automatically. Claude Desktop switches restart the client automatically.
 
@@ -111,7 +129,7 @@ The default application data root remains `~/.codex-switch`, or `CODEX_SWITCH_HO
 Claude Desktop live Cookies paths:
 
 - macOS: `~/Library/Application Support/Claude/Cookies`
-- Windows: `%APPDATA%\Claude\Cookies`
+- Windows: no binaries are included in this release; native end-to-end acceptance remains pending. CI build results do not replace real-device testing.
 
 ## Quality checks
 
@@ -121,14 +139,14 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
 ```
 
-The current baseline is 35 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
+The current baseline is 50 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
 
 ## Security and release boundary
 
 - Credentials and snapshots are local files. Unix data directories target `0700`; credentials, locks, and temporary files are created with `0600`.
 - The application sends the current OAuth token and account ID only to the relevant ChatGPT endpoints for usage queries.
 - There is no project-operated cloud backend, telemetry, or credential synchronization.
-- Current macOS and Windows artifacts are local validation builds, not signed public releases.
+- The GitHub testing prerelease includes a macOS arm64 ZIP and SHA-256 checksums. It is not notarized; no Windows binaries are included.
 - ChatGPT `wham` endpoints are not public stable APIs and may change.
 
 ## Documentation

@@ -27,6 +27,9 @@ Local files, ChatGPT endpoints, Codex/Claude desktop processes
 - `src/profile.rs`: Codex profile storage, alias validation, atomic writes, permissions, trash, and recovery.
 - `src/switcher.rs`: save/adopt/switch flows, token write-back, snapshots, and rollback.
 - `src/login.rs`: start/cancel `codex login`, detect live-file changes, and enforce login timeout.
+- `src/analytics.rs`: four read-only analytics endpoints plus the token profile endpoint, date filtering, and aggregation.
+- `src/valuation.rs`：Token date coverage, validated valuation scenarios and assumptions stored per real account; never infers token types from turn counts.
+- `src/analysis_ui.rs`: account/date-isolated cache, asynchronous response checks, and analytics view models.
 - `src/usage.rs`: usage/activity requests, window classification, reset times, cache, and formatting.
 - `src/claude.rs`: Claude Cookies profiles, SQLite backup/validation, switching, restart, trash, and recovery.
 - `src/restart.rs`: stop and relaunch ChatGPT/Codex desktop applications on macOS and Windows.

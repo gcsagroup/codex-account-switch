@@ -1,4 +1,27 @@
-import { AboutSlint, ScrollView, VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { AboutSlint, ScrollView, VerticalBox, HorizontalBox, ComboBox, Palette, Slider } from "std-widgets.slint";
+
+export struct ValLabels {
+    title: string,
+    tokens: string,
+    value: string,
+    configure: string,
+    model: string,
+    custom: string,
+    input-ratio: string,
+    cache-ratio: string,
+    input-price: string,
+    cache-price: string,
+    output-price: string,
+    price-date: string,
+    apply: string,
+    cancel: string,
+    trend: string,
+    token-mode: string,
+    cost-mode: string,
+    scope: string,
+    source: string,
+    hint: string,
+}
 
 export struct AccountRow {
     alias: string,
@@ -29,15 +52,16 @@ export struct ActivityInvocation {
 
 // Dark control-room palette: quiet surfaces, warm focus, restrained borders.
 global Theme {
-    out property <color> bg: #0F141B;
-    out property <color> panel: #151D27;
-    out property <color> elevated: #1D2835;
-    out property <color> surface: #222F3E;
-    out property <color> line: #2B3949;
+    public pure function series(index: int) -> color { return [#70A3F3, #78CDB1, #DAB16D, #CB95CF, #ABAAF0, #B2B9C4][Math.mod(index,6)]; }
+    out property <color> bg: #12151A;
+    out property <color> panel: #1B1F26;
+    out property <color> elevated: #242A33;
+    out property <color> surface: #2B323D;
+    out property <color> line: #303640;
     out property <color> text: #F0F4F8;
-    out property <color> muted: #93A1B3;
-    out property <color> faint: #607084;
-    out property <color> copper: #E2A344;
+    out property <color> muted: #A3ADBB;
+    out property <color> faint: #84909E;
+    out property <color> copper: #D99328;
     out property <color> copper-dim: #B98234;
     out property <color> danger: #F06B55;
     out property <color> ok: #72C1A8;
@@ -90,95 +114,7 @@ export component AppTray inherits SystemTrayIcon {
     }
 }
 
-component Gauge inherits Rectangle {
-    in property <string> label;
-    in property <float> percent;
-    in property <string> reset-text;
-    in property <bool> available: true;
-    height: 68px;
-    border-radius: 9px;
-    background: Theme.bg.with-alpha(0.52);
-    border-width: 1px;
-    border-color: Theme.line.with-alpha(0.72);
 
-    VerticalBox {
-        padding-left: 11px;
-        padding-right: 11px;
-        padding-top: 8px;
-        padding-bottom: 8px;
-        spacing: 5px;
-
-        HorizontalBox {
-            Text {
-                text: label;
-                font-size: 10px;
-                font-family: "Menlo";
-                color: Theme.muted;
-                letter-spacing: 0.8px;
-                horizontal-stretch: 1;
-            }
-            Text {
-                text: available ? Math.round(percent) + "%" : "—";
-                font-size: 12px;
-                font-weight: 700;
-                font-family: "Menlo";
-                color: !available ? Theme.faint : (percent >= 90 ? Theme.danger : Theme.copper);
-            }
-        }
-
-        Rectangle {
-            height: 5px;
-            border-radius: 3px;
-            background: Theme.line;
-            Rectangle {
-                x: 0px;
-                width: root.available ? parent.width * Math.min(1.0, Math.max(0.0, root.percent / 100)) : 0px;
-                height: parent.height;
-                border-radius: 3px;
-                background: root.percent >= 90 ? Theme.danger : (root.percent >= 70 ? Theme.copper-dim : Theme.copper);
-            }
-        }
-
-        Text {
-            text: reset-text;
-            font-size: 9px;
-            font-family: "Menlo";
-            color: Theme.faint;
-            overflow: elide;
-        }
-    }
-}
-
-component PlanBadge inherits Rectangle {
-    in property <string> label;
-
-    height: 20px;
-    min-width: max(48px, badge-layout.min-width);
-    horizontal-stretch: 0;
-    vertical-stretch: 0;
-    border-radius: 10px;
-    background: Theme.copper.with-alpha(0.14);
-    border-width: 1px;
-    border-color: Theme.copper.with-alpha(0.22);
-
-    badge-layout := HorizontalLayout {
-        padding-left: 9px;
-        padding-right: 9px;
-        padding-top: 2px;
-        padding-bottom: 2px;
-        alignment: center;
-
-        Text {
-            text: label;
-            font-size: 10px;
-            font-family: "Menlo";
-            font-weight: 700;
-            color: Theme.copper;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
-    }
-}
 
 component ActivityMetric inherits Rectangle {
     in property <string> value;
@@ -289,87 +225,7 @@ component GhostButton inherits Rectangle {
     }
 }
 
-component UsageChip inherits Rectangle {
-    in property <string> label;
-    in property <float> percent;
-    in property <string> reset-text;
-    in property <string> reset-label;
-    in property <bool> attention: false;
 
-    height: 38px;
-    horizontal-stretch: 1;
-    vertical-stretch: 0;
-    border-radius: 9px;
-    background: attention ? Theme.danger.with-alpha(0.10) : Theme.bg.with-alpha(0.68);
-    border-width: 1px;
-    border-color: attention ? Theme.danger.with-alpha(0.42) : Theme.line.with-alpha(0.82);
-
-    Text {
-        x: 14px;
-        y: 0px;
-        width: parent.width - 214px;
-        height: parent.height;
-        text: reset-label + " " + reset-text;
-        font-size: 11px;
-        font-family: "Menlo";
-        font-weight: 700;
-        color: attention ? Theme.danger : Theme.muted;
-        vertical-alignment: center;
-        overflow: elide;
-    }
-
-    Text {
-        x: parent.width - 186px;
-        y: 0px;
-        width: 100px;
-        height: parent.height;
-        text: label;
-        font-size: 11px;
-        font-weight: 700;
-        color: attention ? Theme.danger : Theme.muted;
-        horizontal-alignment: right;
-        vertical-alignment: center;
-        overflow: elide;
-    }
-
-    Text {
-        x: parent.width - 78px;
-        y: 0px;
-        width: 64px;
-        height: parent.height;
-        text: Math.round(percent) + "%";
-        font-size: 16px;
-        font-weight: 700;
-        font-family: "Menlo";
-        color: attention ? Theme.danger : Theme.text;
-        horizontal-alignment: right;
-        vertical-alignment: center;
-    }
-}
-
-component LanguageOption inherits Rectangle {
-    in property <string> label;
-    in property <bool> selected: false;
-    callback clicked();
-
-    height: 28px;
-    border-radius: 5px;
-    background: selected ? Theme.copper.with-alpha(0.18) : (option-touch.has-hover ? Theme.panel : transparent);
-
-    option-touch := TouchArea {
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-
-    Text {
-        text: label;
-        font-size: 11px;
-        font-family: "Menlo";
-        color: selected ? Theme.copper : Theme.text;
-        vertical-alignment: center;
-        x: 10px;
-    }
-}
 
 component Field inherits Rectangle {
     in-out property <string> text;
@@ -445,12 +301,54 @@ component TextArea inherits Rectangle {
     }
 }
 
+export struct AnalysisSegment { fraction: float, offset: float, color-index: int }
+export struct AnalysisBar { label: string, detail: string, segments: [AnalysisSegment] }
+export struct AnalysisLegend { name: string, color-index: int }
+export struct AnalysisRank { name: string, value: string, ratio: float }
+
+component RankingPanel inherits Rectangle {
+    in property <string> title;
+    in property <string> total;
+    in property <string> subtitle;
+    in property <string> message;
+    in property <[AnalysisRank]> rows;
+    in property <[string]> options;
+    in-out property <int> selection;
+    callback selected();
+    min-width: 250px;
+    height: 472px;
+    background: Theme.panel; border-radius: 12px; border-width: 1px; border-color: Theme.line;
+    VerticalBox {
+        padding: 18px; spacing: 10px; alignment: start;
+        HorizontalBox {
+            Text { text: root.title; font-size: 16px; font-weight: 600; color: Theme.text; horizontal-stretch: 1; }
+            ComboBox { width: 110px; horizontal-stretch: 0; model: root.options; current-index <=> root.selection; selected(value) => { root.selected(); } }
+        }
+        HorizontalBox {
+            Text { text: root.subtitle; font-size: 11px; color: Theme.muted; horizontal-stretch: 1; wrap: word-wrap; vertical-alignment: center; }
+            Text { text: root.total; font-size: 26px; font-weight: 600; color: Theme.text; }
+        }
+        Text { text: root.message; color: Theme.muted; font-size: 11px; wrap: word-wrap; min-height: 30px; }
+        for row in root.rows: VerticalBox {
+            spacing: 7px; height: 36px;
+            HorizontalBox { spacing: 6px;
+                Text { text: row.name; color: Theme.text; font-size: 12px; overflow: elide; horizontal-stretch: 1; }
+                Text { text: row.value; color: Theme.text; font-size: 12px; }
+            }
+            Rectangle { height: 5px; background: Theme.line; border-radius: 3px;
+                Rectangle { x: 0px; y: 0px; width: parent.width * row.ratio; height: parent.height; background: Theme.series(0); border-radius: 3px; }
+            }
+        }
+    }
+}
+
 export component MainWindow inherits Window {
+    init => { Palette.color-scheme = ColorScheme.dark; }
     title: "Codex Account Switch";
-    preferred-width: 860px;
-    preferred-height: 720px;
-    min-width: 780px;
-    min-height: 480px;
+    preferred-width: 1024px;
+    preferred-height: 800px;
+    min-width: 940px;
+    min-height: 600px;
     background: Theme.bg;
 
     in-out property <[AccountRow]> accounts: [];
@@ -494,12 +392,91 @@ export component MainWindow inherits Window {
     in-out property <int> lang-index: 1;
     in-out property <int> provider-index: 0;
     in-out property <bool> can-restore: false;
+    in-out property <bool> usage-busy: false;
+    in-out property <string> app-version;
+    private property <string> expanded-account: current-alias;
+    changed provider-index => { expanded-account = ""; val-editing = false; }
+    in-out property <string> usage-notice;
+    in-out property <bool> current-stale: false;
+    in-out property <string> current-usage-stamp;
+    in-out property <string> current-activity-error;
+    private property <int> page-index: 0;
+    changed page-index => { content-scroll.viewport-y = 0px; }
+    private property <bool> show-add: false;
+    changed show-add => { if show-add { content-scroll.viewport-y = 0px; } }
+    changed rename-from => { if rename-from != "" { content-scroll.viewport-y = 0px; } }
+    private property <bool> show-network: false;
+    in-out property <int> analysis-range: 0;
+    in-out property <int> analysis-group: 0;
+    in-out property <int> analysis-activity-group: 0;
+    in-out property <int> analysis-tool-group: 0;
+    in-out property <bool> analysis-busy: false;
+    in-out property <string> analysis-date-range;
+    in-out property <string> analysis-status;
+    in-out property <string> analysis-unit;
+    in-out property <string> analysis-max;
+    in-out property <string> analysis-hover;
+    in-out property <string> analysis-usage-message;
+    in-out property <string> analysis-activity-message;
+    in-out property <string> analysis-tool-message;
+    in-out property <string> analysis-turn-total;
+    in-out property <string> analysis-tool-total;
+    in-out property <[AnalysisBar]> analysis-bars;
+    in-out property <[AnalysisLegend]> analysis-legend;
+    in-out property <[AnalysisRank]> analysis-activity-rows;
+    in-out property <[AnalysisRank]> analysis-tool-rows;
+    in-out property <bool> val-available: false;
+    in-out property <bool> val-editing: false;
+    in-out property <string> val-total;
+    in-out property <string> val-cost;
+    in-out property <string> val-message;
+    in-out property <string> val-coverage;
+    in-out property <string> val-basis;
+    in-out property <string> val-error;
+    in-out property <[string]> val-models;
+    in-out property <int> val-model-index: 0;
+    callback select-valuation-model(int);
+    in-out property <float> val-input-percent: 80;
+    in-out property <float> val-cache-percent: 50;
+    in-out property <int> val-chart-mode: 0;
+    in-out property <[AnalysisBar]> val-bars;
+    in-out property <string> val-max;
+    in-out property <string> val-hover;
+    in-out property <ValLabels> val-text;
+    callback open-pricing();
+    callback begin-valuation();
+    callback apply-valuation();
+    callback load-analysis(bool);
+    callback update-analysis();
     private property <bool> show-about: false;
     private property <bool> show-activity: false;
     private property <int> activity-range: 0;
 
     callback set-language(int);
     callback set-provider(int);
+
+    in-out property <string> tr-nav-accounts: "账号管理";
+    in-out property <string> tr-nav-analysis: "分析";
+    in-out property <string> tr-network: "连接状态";
+    in-out property <string> tr-network-hint: "跟随系统代理，也支持代理环境变量。请在系统设置中调整网络后重试。";
+    in-out property <string> tr-add-account: "＋ 添加账号";
+    in-out property <string> tr-cached: "缓存";
+    in-out property <string> tr-more: "更多";
+    in-out property <string> tr-loading: "更新中…";
+    in-out property <string> tr-weekly-used: "每周已用";
+    in-out property <string> tr-days: "天";
+    in-out property <string> tr-plan-usage: "套餐用量";
+    in-out property <string> tr-by-product: "按产品";
+    in-out property <string> tr-by-model: "按模型";
+    in-out property <string> tr-by-client: "按使用端";
+    in-out property <string> tr-product-activity: "产品活动";
+    in-out property <string> tr-tool-activity: "工具活动";
+    in-out property <string> tr-turns: "轮次";
+    in-out property <string> tr-returned-total: "已返回项目合计";
+    in-out property <string> tr-plugins: "插件";
+    in-out property <string> tr-skills: "技能";
+    in-out property <string> tr-analysis-delay: "用量为近似值，最多可能延迟 6 小时。每日用量不等于当前窗口的已用比例。";
+    in-out property <string> tr-analysis-source: "官方账号统计 · 工具榜单为每日返回项目汇总；Token 活动独立展示。";
 
     // i18n text properties
     in-out property <string> tr-app-title: "Codex Account Switch";
@@ -611,429 +588,63 @@ export component MainWindow inherits Window {
     VerticalBox {
         padding: 0px;
         spacing: 0px;
-
-        // Stable top navigation. Context actions live next to the content they affect.
         Rectangle {
-            height: 68px;
+            height: 48px;
             background: Theme.panel;
             HorizontalBox {
-                width: parent.width;
-                height: parent.height;
-                padding-left: 18px;
-                padding-right: 18px;
-                spacing: 10px;
-                alignment: center;
-
-                HorizontalBox {
-                    width: 210px;
-                    spacing: 10px;
-                    alignment: center;
-                    Rectangle {
-                        width: 30px;
-                        height: 30px;
-                        border-radius: 9px;
-                        background: Theme.copper.with-alpha(0.14);
-                        border-width: 1px;
-                        border-color: Theme.copper.with-alpha(0.30);
-                        Text {
-                            text: "C";
-                            font-size: 13px;
-                            font-family: "Menlo";
-                            font-weight: 700;
-                            color: Theme.copper;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                    }
-                    VerticalBox {
-                        spacing: 2px;
-                        alignment: center;
-                        Text {
-                            text: "Codex Account Switch";
-                            font-size: 14px;
-                            font-weight: 700;
-                            letter-spacing: 0.4px;
-                            color: Theme.text;
-                        }
-                        Text {
-                            text: "LOCAL PROFILE CONTROL";
-                            font-size: 8px;
-                            font-family: "Menlo";
-                            letter-spacing: 1px;
-                            color: Theme.faint;
-                        }
-                    }
-                }
-
-                Rectangle {
-                    width: 186px;
-                    height: 36px;
-                    border-radius: 10px;
-                    background: Theme.bg.with-alpha(0.52);
-                    border-width: 1px;
-                    border-color: Theme.line.with-alpha(0.72);
-                    HorizontalBox {
-                        padding: 3px;
-                        spacing: 2px;
-                        for provider[idx] in ["Codex", "Claude Desktop"]: Rectangle {
-                            private property <bool> active: provider-index == idx;
-                            height: 28px;
-                            horizontal-stretch: 1;
-                            border-radius: 7px;
-                            background: active ? Theme.surface : (ptouch.has-hover ? Theme.elevated : transparent);
-                            ptouch := TouchArea {
-                                mouse-cursor: pointer;
-                                clicked => {
-                                    root.show-activity = false;
-                                    root.set-provider(idx);
-                                }
-                            }
-                            Text {
-                                text: provider;
-                                font-size: 10px;
-                                font-weight: 700;
-                                color: active ? Theme.copper : Theme.muted;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-                }
-
-                Rectangle { horizontal-stretch: 1; background: transparent; }
-
-                // Language selector
-                lang-selector := Rectangle {
-                    width: 96px;
-                    height: 34px;
-                    border-radius: 8px;
-                    background: Theme.elevated;
-                    border-width: 1px;
-                    border-color: Theme.line.with-alpha(0.76);
-
-                    HorizontalBox {
-                        padding-left: 8px;
-                        padding-right: 6px;
-                        alignment: center;
-                        Text {
-                            text: ["English", "简体中文", "繁體中文", "日本語", "한국어", "Français", "Español"][lang-index];
-                            font-size: 10px;
-                            color: Theme.text;
-                            vertical-alignment: center;
-                            horizontal-stretch: 1;
-                            overflow: elide;
-                        }
-                        Text {
-                            text: "▾";
-                            font-size: 10px;
-                            color: Theme.muted;
-                            vertical-alignment: center;
-                        }
-                    }
-
-                    TouchArea {
-                        mouse-cursor: pointer;
-                        clicked => { lang-popup.show(); }
-                    }
-                }
-
-                GhostButton {
-                    label: tr-btn-about;
-                    clicked => { show-about = true; }
-                }
-                GhostButton {
-                    label: tr-btn-quit;
-                    danger: true;
-                    clicked => { quit(); }
-                }
+                padding-left: 22px; padding-right: 18px; spacing: 14px;
+                Text { text: "Codex Account Switch  ·  " + app-version; font-size: 14px; font-weight: 600; color: Theme.text; vertical-alignment: center; horizontal-stretch: 1; }
+                ComboBox { width: 140px; horizontal-stretch: 0; model: ["English", "简体中文", "繁體中文", "日本語", "한국어", "Français", "Español"]; current-index <=> root.lang-index; selected(value) => { root.set-language(self.current-index); } }
+                GhostButton { label: tr-btn-about; clicked => { show-about = true; } }
             }
         }
-
         Rectangle { height: 1px; background: Theme.line; }
-
-        // Language dropdown overlay (absolute positioned, right-aligned below top bar)
-        lang-popup := PopupWindow {
-            x: lang-selector.x + lang-selector.width - 216px;
-            y: 68px;
-            width: 216px;
-            Rectangle {
-                border-radius: 8px;
-                background: Theme.elevated;
-                border-width: 1px;
-                border-color: Theme.line;
-                HorizontalBox {
-                    padding: 4px;
-                    spacing: 2px;
-                    VerticalBox {
-                        spacing: 2px;
-                        for lang[idx] in ["English", "简体中文", "繁體中文", "日本語"]: LanguageOption {
-                            label: lang;
-                            selected: idx == lang-index;
-                            clicked => {
-                                root.set-language(idx);
-                                lang-popup.close();
-                            }
-                        }
-                    }
-                    VerticalBox {
-                        spacing: 2px;
-                        for lang[idx] in ["한국어", "Français", "Español"]: LanguageOption {
-                            label: lang;
-                            selected: idx + 4 == lang-index;
-                            clicked => {
-                                root.set-language(idx + 4);
-                                lang-popup.close();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         HorizontalBox {
-            padding-left: 18px;
-            padding-right: 18px;
-            padding-top: 16px;
-            padding-bottom: 16px;
-            spacing: 18px;
-            vertical-stretch: 1;
-
-            // Left: active account gauges (original)
+            spacing: 0px;
             Rectangle {
-                width: 270px;
-                border-radius: 14px;
+                width: 166px;
                 background: Theme.panel;
-                border-width: 1px;
-                border-color: Theme.line.with-alpha(0.78);
-                vertical-stretch: 1;
-
-                ScrollView {
-                    VerticalBox {
-                        padding: 17px;
-                        spacing: 11px;
-
-                    HorizontalBox {
-                        alignment: center;
-                        Text {
-                            text: current-alias != "" && current-alias != active-alias ? tr-detail-title : tr-active-title;
-                            font-size: 10px;
-                            font-family: "Menlo";
-                            letter-spacing: 1.2px;
-                            color: Theme.muted;
-                            horizontal-stretch: 1;
-                            vertical-alignment: center;
-                        }
-                        if provider-index == 0: GhostButton {
-                            label: tr-btn-refresh-usage;
-                            btn-height: 27px;
-                            solid: true;
-                            clicked => { refresh-usage(); }
-                        }
-                    }
-
-                    if current-alias == "": VerticalBox {
-                        padding-top: 34px;
-                        spacing: 10px;
-                        alignment: center;
-                        HorizontalBox {
-                            alignment: center;
-                            Rectangle {
-                                width: 52px;
-                                height: 52px;
-                                border-radius: 26px;
-                                background: Theme.elevated;
-                                border-width: 1px;
-                                border-color: Theme.line;
-                                Text {
-                                    text: "↔";
-                                    font-size: 20px;
-                                    color: Theme.copper;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
-                                }
-                            }
-                        }
-                        Text {
-                            text: tr-active-no-account;
-                            font-size: 18px;
-                            font-weight: 700;
-                            color: Theme.text;
-                            horizontal-alignment: center;
-                        }
-                        Text {
-                            text: tr-active-hint;
-                            font-size: 11px;
-                            color: Theme.muted;
-                            wrap: word-wrap;
-                            horizontal-alignment: center;
-                        }
-                    }
-
-                    if current-alias != "": HorizontalBox {
-                        spacing: 8px;
-                        Text {
-                            text: current-alias;
-                            font-size: 24px;
-                            font-weight: 700;
-                            color: Theme.text;
-                            wrap: word-wrap;
-                            horizontal-stretch: 1;
-                        }
-                        Text {
-                            text: current-alias == active-alias ? tr-label-in-use : tr-label-preview;
-                            font-size: 9px;
-                            font-family: "Menlo";
-                            font-weight: 700;
-                            color: current-alias == active-alias ? Theme.ok : Theme.copper;
-                            vertical-alignment: center;
-                        }
-                    }
-
-                    if current-alias != "": Text {
-                        text: current-email == "" ? tr-label-no-email : current-email;
-                        font-size: 12px;
-                        color: Theme.muted;
-                        wrap: word-wrap;
-                    }
-
-                    if current-alias != "": HorizontalBox {
-                        spacing: 8px;
-                        if current-plan != "": PlanBadge {
-                            label: current-plan;
-                        }
-                        if current-credits != "": Text {
-                            text: "credits " + current-credits;
-                            font-size: 11px;
-                            font-family: "Menlo";
-                            color: Theme.ok;
-                            vertical-alignment: center;
-                        }
-                        Rectangle { horizontal-stretch: 1; background: transparent; }
-                    }
-
-                    if current-alias != "" && provider-index == 0 && current-reset-credits != "": Text {
-                        text: current-reset-credits;
-                        font-size: 11px;
-                        font-family: "Menlo";
-                        font-weight: 700;
-                        color: Theme.copper;
-                    }
-
-                    if current-alias != "": Rectangle { height: 1px; background: Theme.line.with-alpha(0.72); }
-
-                    if current-alias != "" && provider-index == 0 && current-token-lifetime != "": VerticalBox {
-                        spacing: 6px;
-                        padding-top: 2px;
-                        padding-bottom: 2px;
-
-                        Text {
-                            text: tr-token-title;
-                            font-size: 9px;
-                            font-family: "Menlo";
-                            letter-spacing: 1.2px;
-                            color: Theme.copper;
-                        }
-
-                        GridLayout {
-                            spacing-horizontal: 12px;
-                            spacing-vertical: 4px;
-                            Row {
-                                Text { text: tr-token-lifetime; font-size: 11px; font-family: "Menlo"; color: Theme.muted; }
-                                Text { text: current-token-lifetime; font-size: 12px; font-weight: 700; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
-                            }
-                            Row {
-                                Text { text: tr-token-peak; font-size: 11px; font-family: "Menlo"; color: Theme.muted; }
-                                Text { text: current-token-peak; font-size: 12px; font-weight: 700; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
-                            }
-                            Row {
-                                Text { text: tr-token-streak; font-size: 11px; font-family: "Menlo"; color: Theme.muted; }
-                                Text { text: current-token-streak; font-size: 12px; font-weight: 700; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
-                            }
-                            Row {
-                                Text { text: tr-token-longest; font-size: 11px; font-family: "Menlo"; color: Theme.muted; }
-                                Text { text: current-token-longest; font-size: 12px; font-weight: 700; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
-                            }
-                        }
-
-                        if current-token-week != "": HorizontalBox {
-                            Text {
-                                text: tr-token-last-seven;
-                                font-size: 9px;
-                                font-family: "Menlo";
-                                letter-spacing: 1px;
-                                color: Theme.muted;
-                                horizontal-stretch: 1;
-                            }
-                            Text {
-                                text: current-token-week;
-                                font-size: 10px;
-                                font-weight: 700;
-                                font-family: "Menlo";
-                                color: Theme.text;
-                            }
-                        }
-
-                        if current-token-week != "": trend-chart := Rectangle {
-                            height: 30px;
-                            background: Theme.bg.with-alpha(0.48);
-                            border-radius: 7px;
-                            border-width: 1px;
-                            border-color: Theme.line.with-alpha(0.55);
-
-                            for value[idx] in root.current-token-trend: Rectangle {
-                                width: (trend-chart.width - 36px) / 7;
-                                x: 3px + idx * ((trend-chart.width - 36px) / 7 + 5px);
-                                height: Math.max(2px, value * 21px);
-                                y: trend-chart.height - self.height - 3px;
-                                border-radius: 2px;
-                                background: value > 0 ? Theme.copper : Theme.line;
-                            }
-                        }
-
-                        GhostButton {
-                            label: tr-activity-open;
-                            btn-height: 30px;
-                            solid: true;
-                            clicked => {
-                                activity-range = 0;
-                                show-activity = true;
-                            }
-                        }
-                    }
-
-                    if current-alias != "" && provider-index == 0 && current-token-lifetime != "": Rectangle { height: 1px; background: Theme.line.with-alpha(0.72); }
-
-                    if current-alias != "" && provider-index == 0: Gauge {
-                        label: tr-gauge-5h;
-                        percent: current-primary;
-                        reset-text: current-primary-reset;
-                        available: current-primary-available;
-                    }
-                    if current-alias != "" && provider-index == 0: Gauge {
-                        label: tr-gauge-weekly;
-                        percent: current-secondary;
-                        reset-text: current-secondary-reset;
-                        available: current-secondary-available;
-                    }
-
-                    Rectangle { vertical-stretch: 1; background: transparent; }
-
-                    if current-alias != "" && provider-index == 1: Text {
-                        text: tr-claude-session-hint;
-                        font-size: 11px;
-                        color: Theme.faint;
-                        wrap: word-wrap;
-                    }
-                }
+                VerticalBox {
+                    padding: 14px; padding-top: 28px; spacing: 10px;
+                    Text { text: "Account Switch"; color: Theme.copper; font-size: 14px; font-weight: 600; }
+                    Rectangle { height: 16px; }
+                    Text { text: "CODEX"; color: Theme.faint; font-size: 10px; }
+                    GhostButton { label: tr-nav-accounts; solid: provider-index == 0 && page-index == 0; horizontal-stretch: 1; btn-height: 38px; clicked => { page-index = 0; show-activity = false; root.set-provider(0); } }
+                    GhostButton { label: tr-nav-analysis; solid: provider-index == 0 && page-index == 1; horizontal-stretch: 1; btn-height: 38px; clicked => { if provider-index != 0 { root.set-provider(0); } page-index = 1; show-activity = false; root.load-analysis(false); } }
+                    Rectangle { height: 14px; }
+                    GhostButton { label: "Claude Desktop"; solid: provider-index == 1; horizontal-stretch: 1; btn-height: 38px; clicked => { page-index = 0; show-activity = false; root.set-provider(1); } }
+                    Rectangle { vertical-stretch: 1; }
+                    GhostButton { label: tr-network; horizontal-stretch: 1; clicked => { show-network = !show-network; } }
+                    GhostButton { label: tr-btn-quit; horizontal-stretch: 1; clicked => { quit(); } }
                 }
             }
-
-            // Right: import tabs + list
-            VerticalBox {
-                spacing: 12px;
+            Rectangle { width: 1px; background: Theme.line; }
+            content-scroll := ScrollView {
                 horizontal-stretch: 1;
-
-                Rectangle {
+                VerticalBox {
+                    padding: 26px; spacing: 20px;
+                    if show-network: Rectangle {
+                        height: 126px; border-radius: 10px; background: Theme.elevated;
+                        VerticalBox {
+                            padding: 16px; spacing: 8px;
+                            Text { text: tr-network; color: Theme.text; font-size: 15px; font-weight: 600; }
+                            Text { text: tr-network-hint; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                            HorizontalBox {
+                                Text { text: status-text; color: Theme.muted; font-size: 11px; overflow: elide; horizontal-stretch: 1; vertical-alignment: center; }
+                                GhostButton { label: tr-btn-refresh-usage; enabled: !usage-busy; clicked => { root.refresh-usage(); } }
+                            }
+                        }
+                    }
+                    if page-index == 0: VerticalBox {
+                        spacing: 20px;
+                        HorizontalBox {
+                            VerticalBox { spacing: 4px; horizontal-stretch: 1;
+                                Text { text: provider-index == 0 ? tr-nav-accounts : "Claude Desktop"; font-size: 25px; font-weight: 600; color: Theme.text; }
+                                Text { text: accounts.length + " " + tr-profiles-count; font-size: 12px; color: Theme.muted; }
+                            }
+                            GhostButton { label: show-add ? tr-about-close : tr-add-account; emphasis: !show-add; clicked => { show-add = !show-add; } }
+                        }
+                        if show-add || rename-from != "": Rectangle {
                     // Content height differs by mode. Rename is a focused
                     // state that replaces the import form inside this card.
                     height: rename-from != ""
@@ -1054,29 +665,13 @@ export component MainWindow inherits Window {
                         // Import method tabs
                         HorizontalBox {
                             spacing: 6px;
-                            for tab[idx] in [tr-import-tab-login, tr-import-tab-save, tr-import-tab-path, tr-import-tab-paste]: Rectangle {
-                                private property <bool> active: import-tab == idx;
+                            for tab[idx] in [tr-import-tab-login, tr-import-tab-save, tr-import-tab-path, tr-import-tab-paste]: GhostButton {
                                 visible: provider-index == 0 || idx < 2;
-                                height: 30px;
-                                min-width: 0px;
+                                label: provider-index == 1 && idx == 0 ? "Claude Desktop" : tab;
+                                solid: import-tab == idx;
                                 horizontal-stretch: 1;
-                                border-radius: 7px;
-                                background: active ? Theme.surface : (itouch.has-hover ? Theme.elevated : Theme.bg.with-alpha(0.32));
-                                border-width: 1px;
-                                border-color: active ? Theme.copper.with-alpha(0.28) : Theme.line.with-alpha(0.48);
-
-                                itouch := TouchArea {
-                                    clicked => { import-tab = idx; }
-                                }
-
-                                Text {
-                                    text: provider-index == 1 && idx == 0 ? "Claude Desktop" : tab;
-                                    font-size: 11px;
-                                    font-weight: 700;
-                                    color: active ? Theme.copper : Theme.muted;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
-                                }
+                                btn-height: 32px;
+                                clicked => { import-tab = idx; }
                             }
                         }
 
@@ -1224,348 +819,215 @@ export component MainWindow inherits Window {
                         }
                     }
                 }
-
-                HorizontalBox {
-                    spacing: 8px;
-                    Text {
-                        text: tr-profiles-title;
-                        font-size: 10px;
-                        font-family: "Menlo";
-                        letter-spacing: 1.2px;
-                        color: Theme.muted;
-                        vertical-alignment: center;
-                        horizontal-stretch: 1;
-                    }
-                    Text {
-                        text: accounts.length + " " + tr-profiles-count;
-                        font-size: 11px;
-                        font-family: "Menlo";
-                        color: Theme.muted;
-                        vertical-alignment: center;
-                    }
-                    GhostButton {
-                        label: tr-btn-refresh-list;
-                        btn-height: 28px;
-                        clicked => { refresh(); }
-                    }
-                    GhostButton {
-                        label: tr-btn-restore;
-                        btn-height: 28px;
-                        solid: true;
-                        enabled: can-restore;
-                        clicked => { restore-account(); }
-                    }
-                }
-
-                Rectangle {
-                    border-radius: 14px;
-                    background: transparent;
-                    border-width: 0px;
-                    vertical-stretch: 1;
-
-                    ScrollView {
-                        VerticalBox {
-                            padding: 0px;
-                            spacing: 6px;
-
-                            if accounts.length == 0: VerticalBox {
-                                padding-top: 78px;
-                                padding-left: 28px;
-                                padding-right: 28px;
-                                spacing: 9px;
-                                alignment: center;
-                                HorizontalBox {
-                                    alignment: center;
-                                    Rectangle {
-                                        width: 42px;
-                                        height: 42px;
-                                        border-radius: 10px;
-                                        background: Theme.elevated;
-                                        border-width: 1px;
-                                        border-color: Theme.line;
-                                        Text {
-                                            text: "+";
-                                            font-size: 24px;
-                                            color: Theme.copper;
-                                            horizontal-alignment: center;
-                                            vertical-alignment: center;
-                                        }
-                                    }
-                                }
-                                Text {
-                                    text: tr-profiles-empty;
-                                    font-size: 14px;
-                                    font-weight: 700;
-                                    color: Theme.text;
-                                    horizontal-alignment: center;
-                                }
-                                Text {
-                                    text: tr-profiles-empty-hint;
-                                    font-size: 11px;
-                                    color: Theme.muted;
-                                    horizontal-alignment: center;
-                                    wrap: word-wrap;
-                                }
-                            }
-
-                            for acc in root.accounts: account-card := Rectangle {
-                                private property <bool> selected: acc.alias == root.current-alias;
-                                height: provider-index == 0
-                                    ? (acc.usage_error != "" ? 134px : 114px)
-                                    : 64px;
-                                vertical-stretch: 0;
-                                clip: true;
-                                border-radius: 11px;
-                                background: selected ? Theme.copper.with-alpha(0.09)
-                                    : (acc.is_current ? Theme.ok.with-alpha(0.045) : Theme.panel);
-                                border-width: 1px;
-                                border-color: selected ? Theme.copper.with-alpha(0.58)
-                                    : (acc.is_current ? Theme.ok.with-alpha(0.30) : Theme.line.with-alpha(0.72));
+                        HorizontalBox {
+                            Text { text: tr-profiles-title; font-size: 16px; font-weight: 600; color: Theme.text; horizontal-stretch: 1; vertical-alignment: center; }
+                            GhostButton { label: tr-btn-refresh-list; clicked => { root.refresh(); } }
+                            if provider-index == 0: GhostButton { label: usage-busy ? tr-loading : tr-btn-refresh-usage; enabled: !usage-busy; clicked => { root.refresh-usage(); } }
+                        }
+                        if accounts.length == 0: Text { text: tr-profiles-empty + "\n" + tr-profiles-empty-hint; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                        for acc in root.accounts: account-row := Rectangle {
+                            private property <bool> expanded: false;
+                            private property <bool> details: root.expanded-account == acc.alias && root.current-alias == acc.alias;
+                            vertical-stretch: 0;
+                            background: Theme.panel;
+                            border-radius: 10px;
+                            border-width: 1px; border-color: details ? Theme.copper.with-alpha(0.45) : Theme.line;
+                            TouchArea {
+                                x: 0px; y: 0px; height: 74px;
+                                mouse-cursor: pointer;
                                 accessible-role: button;
-                                accessible-label: tr-detail-title + " · " + acc.alias;
-                                accessible-action-default => { root.preview-account(acc.alias); }
-
-                                TouchArea {
-                                    mouse-cursor: pointer;
-                                    clicked => { root.preview-account(acc.alias); }
-                                }
-
-                                VerticalBox {
-                                    width: parent.width;
-                                    height: parent.height;
-                                    padding-top: 7px;
-                                    padding-bottom: 7px;
-                                    padding-left: 12px;
-                                    padding-right: 12px;
-                                    spacing: 4px;
-                                    alignment: start;
-
-                                    HorizontalBox {
-                                        height: 26px;
-                                        horizontal-stretch: 1;
-                                        vertical-stretch: 0;
-                                        spacing: 10px;
-
-                                        Rectangle {
-                                            width: 4px;
-                                            height: 24px;
-                                            border-radius: 3px;
-                                            background: account-card.selected ? Theme.copper
-                                                : (acc.is_current ? Theme.ok : Theme.line.with-alpha(0.72));
-                                        }
-
-                                        HorizontalBox {
-                                            horizontal-stretch: 1;
-                                            height: 26px;
-                                            vertical-stretch: 0;
-                                            spacing: 8px;
-                                            Text {
-                                                text: acc.alias;
-                                                height: 26px;
-                                                font-size: 13px;
-                                                font-weight: 700;
-                                                color: Theme.text;
-                                                vertical-alignment: center;
-                                            }
-                                            if acc.plan != "": Text {
-                                                text: acc.plan;
-                                                height: 26px;
-                                                font-size: 10px;
-                                                font-family: "Menlo";
-                                                color: Theme.muted;
-                                                vertical-alignment: center;
-                                            }
-                                            if acc.is_current: Text {
-                                                text: tr-label-in-use;
-                                                height: 26px;
-                                                font-size: 9px;
-                                                font-family: "Menlo";
-                                                font-weight: 700;
-                                                color: Theme.ok;
-                                                vertical-alignment: center;
-                                            }
-                                            if account-card.selected && !acc.is_current: Text {
-                                                text: tr-label-preview;
-                                                height: 26px;
-                                                font-size: 9px;
-                                                font-family: "Menlo";
-                                                font-weight: 700;
-                                                color: Theme.copper;
-                                                vertical-alignment: center;
-                                            }
-                                            if !acc.is_valid: Text {
-                                                text: tr-label-invalid;
-                                                height: 26px;
-                                                font-size: 9px;
-                                                font-family: "Menlo";
-                                                font-weight: 700;
-                                                color: Theme.danger;
-                                                vertical-alignment: center;
-                                            }
-                                            Rectangle { horizontal-stretch: 1; background: transparent; }
-
-                                        }
-
-                                        if !acc.is_current: GhostButton {
-                                            label: tr-btn-switch;
-                                            emphasis: true;
-                                            enabled: acc.is_valid;
-                                            btn-height: 26px;
-                                            min-width: 48px;
-                                            clicked => { use-account(acc.alias); }
-                                        }
-                                        if provider-index == 0 && !acc.is_current: GhostButton {
-                                            label: tr-btn-restart;
-                                            solid: true;
-                                            enabled: acc.is_valid;
-                                            btn-height: 26px;
-                                            min-width: 48px;
-                                            clicked => { use-account-restart(acc.alias); }
-                                        }
-                                        GhostButton {
-                                            label: tr-btn-rename;
-                                            solid: true;
-                                            btn-height: 26px;
-                                            min-width: 48px;
-                                            clicked => { begin-rename(acc.alias); }
-                                        }
-                                        GhostButton {
-                                            label: tr-btn-delete;
-                                            danger: true;
-                                            btn-height: 26px;
-                                            min-width: 48px;
-                                            clicked => { remove-account(acc.alias); }
-                                        }
-                                    }
-
-                                    HorizontalBox {
-                                        height: 18px;
-                                        horizontal-stretch: 1;
-                                        vertical-stretch: 0;
-                                        padding-left: 14px;
-                                        spacing: 8px;
-
-                                        Text {
-                                            text: acc.email == "" ? tr-label-no-email : acc.email;
-                                            height: 18px;
-                                            font-size: 10px;
-                                            color: Theme.muted;
-                                            vertical-alignment: center;
-                                            overflow: elide;
-                                            horizontal-stretch: 1;
-                                        }
-                                        if provider-index == 0 && acc.usage_updated != "": Text {
-                                            text: acc.usage_updated;
-                                            height: 18px;
-                                            font-size: 9px;
-                                            font-family: "Menlo";
-                                            color: Theme.faint;
-                                            vertical-alignment: center;
-                                        }
-                                        if provider-index == 0 && acc.reset_credits != "": Text {
-                                            text: acc.reset_credits;
-                                            height: 18px;
-                                            font-size: 9px;
-                                            font-family: "Menlo";
-                                            font-weight: 700;
-                                            color: Theme.copper;
-                                            vertical-alignment: center;
-                                        }
-                                    }
-
-                                    if provider-index == 0 && (acc.primary_available || acc.secondary_available): HorizontalBox {
-                                        height: 38px;
-                                        padding-left: 14px;
-                                        vertical-stretch: 0;
-                                        spacing: 8px;
-                                        if acc.primary_available: UsageChip {
-                                            label: tr-gauge-5h;
-                                            percent: acc.primary_pct;
-                                            reset-text: acc.primary_reset;
-                                            reset-label: tr-usage-reset;
-                                            attention: acc.primary_pct >= 90;
-                                        }
-                                        if acc.secondary_available: UsageChip {
-                                            label: tr-gauge-weekly;
-                                            percent: acc.secondary_pct;
-                                            reset-text: acc.secondary_reset;
-                                            reset-label: tr-usage-reset;
-                                            attention: acc.secondary_pct >= 90;
-                                        }
-                                    }
-
-                                    if provider-index == 0 && !acc.primary_available && !acc.secondary_available: HorizontalBox {
-                                        height: 38px;
-                                        padding-left: 14px;
-                                        vertical-stretch: 0;
-                                        Text {
-                                            text: acc.usage_summary;
-                                            height: 38px;
-                                            font-size: 11px;
-                                            font-family: "Menlo";
-                                            color: acc.usage_attention ? Theme.danger : Theme.faint;
-                                            vertical-alignment: center;
-                                            overflow: elide;
-                                            horizontal-stretch: 1;
-                                        }
-                                    }
-
-                                    if acc.usage_error != "": HorizontalBox {
-                                        height: 16px;
-                                        padding-left: 14px;
-                                        Text {
-                                            text: acc.usage_error;
-                                            height: 16px;
-                                            font-size: 10px;
-                                            color: Theme.danger;
-                                            vertical-alignment: center;
-                                            overflow: elide;
-                                            horizontal-stretch: 1;
-                                        }
-                                    }
+                                accessible-label: root.tr-detail-title + " · " + acc.alias;
+                                clicked => {
+                                    if root.expanded-account == acc.alias { root.expanded-account = ""; }
+                                    else { root.expanded-account = acc.alias; root.preview-account(acc.alias); }
                                 }
                             }
+                            VerticalBox { padding: 16px; spacing: 12px;
+                                HorizontalBox { spacing: 12px; min-height: 42px;
+                                    VerticalBox { spacing: 4px; horizontal-stretch: 1;
+                                        Text { text: acc.alias + "  " + acc.plan + (acc.is_current ? " · " + tr-label-in-use : ""); font-size: 14px; font-weight: 600; color: Theme.text; overflow: elide; }
+                                        Text { text: acc.email; font-size: 11px; color: Theme.muted; overflow: elide; }
+                                    }
+                                    if provider-index == 0 && !account-row.details: Text { text: acc.secondary_available ? tr-weekly-used + " " + Math.round(acc.secondary_pct) + "%" : "—"; font-size: 12px; color: Theme.muted; vertical-alignment: center; }
+                                    Text { text: account-row.details ? "▴" : "▾"; color: Theme.muted; vertical-alignment: center; }
+                                    if !acc.is_current: GhostButton { label: tr-btn-switch; enabled: acc.is_valid; clicked => { root.use-account(acc.alias); } }
+                                    if provider-index == 0: GhostButton { label: tr-nav-analysis; clicked => { root.preview-account(acc.alias); page-index = 1; root.load-analysis(false); } }
+                                    GhostButton { label: tr-more; solid: account-row.expanded; clicked => { account-row.expanded = !account-row.expanded; } }
+                                }
+                                if account-row.details: VerticalBox {
+                                    spacing: 14px;
+                                    Rectangle { height: 1px; background: Theme.line; }
+                                    if provider-index == 0: HorizontalBox {
+                                        spacing: 24px;
+                                        VerticalBox { spacing: 5px; horizontal-stretch: 2;
+                                            Text { text: tr-weekly-used + (current-stale ? " · " + tr-cached : ""); color: Theme.muted; font-size: 12px; }
+                                            Text { text: current-secondary-available ? Math.round(current-secondary) + "%" : "—"; font-size: 26px; font-weight: 600; color: Theme.text; }
+                                            Rectangle { height: 6px; border-radius: 3px; background: Theme.line;
+                                                Rectangle { x: 0px; y: 0px; width: parent.width * Math.min(1,Math.max(0,current-secondary / 100)); height: parent.height; border-radius: 3px; background: current-stale ? Theme.muted : Theme.copper; visible: current-secondary-available; }
+                                            }
+                                            Text { text: current-secondary-reset; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
+                                        }
+                                        VerticalBox { spacing: 5px; horizontal-stretch: 1;
+                                            Text { text: tr-gauge-5h; font-size: 12px; color: Theme.muted; }
+                                            if current-primary-available: Text { text: Math.round(current-primary) + "%"; font-size: 26px; color: Theme.text; font-weight: 600; }
+                                            Text { text: current-primary-reset; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
+                                        }
+                                        VerticalBox { spacing: 9px; horizontal-stretch: 1;
+                                            Text { text: current-reset-credits; font-size: 12px; color: Theme.copper; wrap: word-wrap; }
+                                            Text { text: "Credits  " + (current-credits == "" ? "—" : current-credits); color: Theme.muted; font-size: 12px; }
+                                        }
+                                    }
+                                    Text { text: provider-index == 0 ? current-usage-stamp : tr-claude-session-hint; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
+                                }
+                                if provider-index == 0 && !account-row.details: Text { text: (acc.usage_error != "" ? tr-cached + " · " : "") + acc.usage_updated; font-size: 11px; color: Theme.muted; }
+                                if provider-index == 0 && acc.usage_error != "": Text { text: acc.usage_error; font-size: 11px; color: Theme.copper; wrap: word-wrap; }
+                                if account-row.expanded: HorizontalBox { spacing: 8px;
+                                    GhostButton { label: tr-detail-title; clicked => { root.expanded-account = acc.alias; root.preview-account(acc.alias); } }
+                                    GhostButton { label: tr-btn-restart; enabled: acc.is_valid; clicked => { root.use-account-restart(acc.alias); } }
+                                    GhostButton { label: tr-btn-rename; clicked => { show-add = true; root.begin-rename(acc.alias); } }
+                                    GhostButton { label: tr-btn-delete; danger: true; clicked => { root.remove-account(acc.alias); } }
+                                }
+                            }
+                        }
+                        HorizontalBox {
+                            Text { text: tr-active-restart-hint; color: Theme.muted; font-size: 11px; horizontal-stretch: 1; wrap: word-wrap; visible: provider-index == 0; }
+                            GhostButton { label: tr-btn-restore; enabled: can-restore; clicked => { root.restore-account(); } }
+                        }
+                    }
+                    if page-index == 1 && provider-index == 0: VerticalBox {
+                        spacing: 20px;
+                        HorizontalBox { spacing: 10px;
+                            VerticalBox { spacing: 4px; horizontal-stretch: 1;
+                                Text { text: tr-nav-analysis; font-size: 25px; font-weight: 600; color: Theme.text; }
+                                Text { text: current-alias + " · " + current-plan + "  /  " + analysis-date-range; color: Theme.muted; font-size: 12px; overflow: elide; }
+                            }
+                            ComboBox { width: 90px; horizontal-stretch: 0; model: ["7 " + tr-days, "30 " + tr-days]; current-index <=> root.analysis-range; selected(value) => { root.load-analysis(false); } }
+                            GhostButton { label: analysis-busy ? tr-loading : tr-btn-refresh-usage; enabled: !analysis-busy && current-alias != ""; clicked => { root.load-analysis(true); } }
+                        }
+                        if analysis-status != "": Text { text: analysis-status; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
+                        Rectangle {
+                            vertical-stretch: 0; background: Theme.panel; border-radius: 12px; border-width: 1px; border-color: Theme.line;
+                            VerticalBox { padding: 20px; spacing: 14px;
+                                Text { text: val-text.title; font-size: 16px; font-weight: 600; color: Theme.text; }
+                                HorizontalBox { spacing: 18px;
+                                    VerticalBox { horizontal-stretch: 1; spacing: 5px;
+                                        Text { text: val-text.tokens; font-size: 12px; color: Theme.muted; }
+                                        Text { text: val-total; font-size: 25px; font-weight: 600; color: Theme.text; overflow: elide; }
+                                    }
+                                    VerticalBox { horizontal-stretch: 1; spacing: 5px;
+                                        Text { text: val-text.value; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
+                                        Text { text: val-cost; font-size: 25px; font-weight: 600; color: Theme.copper; overflow: elide; }
+                                    }
+                                }
+                                Text { text: val-coverage; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
+                                Text { text: val-message; font-size: 11px; color: Theme.copper; wrap: word-wrap; }
+                                Text { text: val-basis; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
+                                HorizontalBox { spacing: 12px;
+                                    Text { text: val-text.model; font-size: 12px; color: Theme.muted; vertical-alignment: center; }
+                                    ComboBox { horizontal-stretch: 1; model: val-models; current-index <=> val-model-index; enabled: val-available; selected(value) => { root.select-valuation-model(self.current-index); } }
+                                    GhostButton { label: val-text.configure; enabled: val-available; clicked => { root.begin-valuation(); } }
+                                }
+                                if val-error != "": Text { text: val-error; color: Theme.danger; font-size: 12px; wrap: word-wrap; }
+                                if val-editing: VerticalBox { spacing: 12px;
+                                    Rectangle { height: 1px; background: Theme.line; }
+                                    Text { text: val-text.hint; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                                    HorizontalBox { spacing: 16px;
+                                        VerticalBox { horizontal-stretch: 1; spacing: 5px; Text { text: val-text.input-ratio + " " + Math.round(val-input-percent) + "%"; font-size: 12px; color: Theme.muted; wrap: word-wrap; } Slider { minimum: 0; maximum: 100; value <=> val-input-percent; } }
+                                        VerticalBox { horizontal-stretch: 1; spacing: 5px; Text { text: val-text.cache-ratio + " " + Math.round(val-cache-percent) + "%"; font-size: 12px; color: Theme.muted; wrap: word-wrap; } Slider { minimum: 0; maximum: 100; value <=> val-cache-percent; } }
+                                    }
+                                    HorizontalBox { spacing: 12px;
+                                        GhostButton { label: val-text.apply; emphasis: true; clicked => { root.apply-valuation(); } }
+                                        GhostButton { label: val-text.cancel; clicked => { val-editing = false; val-error = ""; } }
+                                    }
+                                }
+                                Text { text: val-text.scope; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
+                                GhostButton { label: val-text.source + " ↗"; clicked => { root.open-pricing(); } }
+                            }
+                        }
+                        Rectangle {
+                            height: 240px; background: Theme.panel; border-radius: 12px; border-width: 1px; border-color: Theme.line;
+                            VerticalBox { padding: 20px; spacing: 10px;
+                                HorizontalBox {
+                                    Text { text: val-text.trend; font-size: 16px; font-weight: 600; color: Theme.text; horizontal-stretch: 1; vertical-alignment: center; }
+                                    ComboBox { width: 160px; model: [val-text.token-mode, val-text.cost-mode]; current-index <=> val-chart-mode; selected(value) => { root.update-analysis(); } }
+                                }
+                                Rectangle { min-height: 120px; vertical-stretch: 1;
+                                    Text { text: val-max; color: Theme.muted; font-size: 10px; x: 0px; y: 0px; }
+                                    Text { text: "0"; color: Theme.muted; font-size: 10px; x: 0px; y: parent.height - 35px; }
+                                    HorizontalBox { padding-left: 80px; spacing: root.analysis-range == 0 ? 10px : 2px;
+                                        for bar in val-bars: Rectangle { horizontal-stretch: 1;
+                                            accessible-role: button; accessible-label: bar.detail;
+                                            accessible-action-default => { root.val-hover = bar.detail; }
+                                            if bar.segments.length == 0: Text { text: "—"; y: parent.height - 45px; width: parent.width; horizontal-alignment: center; color: Theme.muted; font-size: 11px; }
+                                            for segment in bar.segments: Rectangle { x: 0px; width: parent.width; y: 12px + (parent.height - 40px) * (1 - segment.fraction); height: (parent.height - 40px) * segment.fraction; background: Theme.series(0); }
+                                            Text { text: bar.label; y: parent.height - 22px; width: parent.width; horizontal-alignment: center; color: Theme.muted; font-size: 10px; }
+                                            TouchArea { mouse-cursor: pointer; changed has-hover => { if self.has-hover { root.val-hover = bar.detail; } } clicked => { root.val-hover = bar.detail; } }
+                                        }
+                                    }
+                                }
+                                Text { text: val-hover; min-height: 16px; font-size: 11px; color: Theme.muted; overflow: elide; }
+                            }
+                        }
+                        Rectangle {
+                            height: 318px; background: Theme.panel; border-radius: 12px; border-width: 1px; border-color: Theme.line;
+                            VerticalBox { padding: 20px; spacing: 12px;
+                                HorizontalBox { spacing: 10px;
+                                    VerticalBox { spacing: 4px; horizontal-stretch: 1;
+                                        Text { text: tr-plan-usage; font-size: 16px; font-weight: 600; color: Theme.text; }
+                                        Text { text: analysis-unit; font-size: 11px; color: Theme.muted; }
+                                    }
+                                    ComboBox { width: 110px; horizontal-stretch: 0; model: [tr-by-product, tr-by-model]; current-index <=> root.analysis-group; selected(value) => { root.update-analysis(); } }
+                                }
+                                if analysis-usage-message != "": Text { text: analysis-usage-message; color: Theme.copper; font-size: 11px; wrap: word-wrap; }
+                                chart := Rectangle {
+                                    horizontal-stretch: 1; vertical-stretch: 1; min-height: 140px;
+                                    Text { text: analysis-max; color: Theme.muted; font-size: 10px; x: 0px; y: 0px; }
+                                    Rectangle { x: 36px; y: 12px; width: parent.width - 40px; height: 1px; background: Theme.line.with-alpha(0.55); }
+                                    Rectangle { x: 36px; y: (parent.height - 26px) / 2; width: parent.width - 40px; height: 1px; background: Theme.line.with-alpha(0.55); }
+                                    Text { text: "0"; x: 0px; y: parent.height - 38px; font-size: 10px; color: Theme.muted; }
+                                    HorizontalBox {
+                                        padding-left: 36px; spacing: root.analysis-range == 0 ? 10px : 2px;
+                                        for bar in root.analysis-bars: bar-cell := Rectangle {
+                                            horizontal-stretch: 1;
+                                            accessible-role: button; accessible-label: bar.detail;
+                                            accessible-action-default => { root.analysis-hover = bar.detail; }
+                                            for segment in bar.segments: Rectangle {
+                                                x: parent.width * 0.1; width: parent.width * 0.8;
+                                                y: 12px + (parent.height - 44px) * (1 - segment.offset - segment.fraction);
+                                                height: (parent.height - 44px) * segment.fraction;
+                                                background: Theme.series(segment.color-index);
+                                            }
+                                            Text { text: bar.label; y: parent.height - 24px; width: parent.width; horizontal-alignment: center; color: Theme.muted; font-size: 10px; }
+                                            TouchArea { mouse-cursor: pointer; changed has-hover => { if self.has-hover { root.analysis-hover = bar.detail; } } clicked => { root.analysis-hover = bar.detail; } }
+                                        }
+                                    }
+                                }
+                                HorizontalBox { spacing: 12px;
+                                    for series in root.analysis-legend: HorizontalBox { spacing: 4px;
+                                        Rectangle { width: 7px; height: 7px; border-radius: 4px; background: Theme.series(series.color-index); }
+                                        Text { text: series.name; font-size: 10px; color: Theme.muted; overflow: elide; }
+                                    }
+                                }
+                                Text { text: analysis-hover; color: Theme.muted; font-size: 11px; overflow: elide; min-height: 16px; }
+                            }
+                        }
+                        Text { text: tr-analysis-delay; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                        HorizontalBox { spacing: 18px;
+                            RankingPanel { title: tr-product-activity; total: analysis-turn-total; subtitle: tr-turns; rows: analysis-activity-rows; message: analysis-activity-message; options: [tr-by-model, tr-by-client]; selection <=> root.analysis-activity-group; selected => { root.update-analysis(); } }
+                            RankingPanel { title: tr-tool-activity; total: analysis-tool-total; subtitle: tr-returned-total; rows: analysis-tool-rows; message: analysis-tool-message; options: [tr-plugins, tr-skills]; selection <=> root.analysis-tool-group; selected => { root.update-analysis(); } }
+                        }
+                        HorizontalBox { spacing: 12px;
+                            Text { text: tr-analysis-source; color: Theme.muted; font-size: 11px; horizontal-stretch: 1; wrap: word-wrap; }
+                            GhostButton { label: tr-token-title + " →"; clicked => { show-activity = true; activity-range = 0; } }
                         }
                     }
                 }
             }
         }
-
-        Rectangle {
-            height: 32px;
-            background: Theme.panel;
-            border-width: 1px;
-            border-color: Theme.line;
-            HorizontalBox {
-                width: parent.width;
-                height: parent.height;
-                padding-left: 16px;
-                padding-right: 16px;
-                spacing: 8px;
-                alignment: center;
-                Rectangle {
-                    width: 7px;
-                    height: 7px;
-                    border-radius: 4px;
-                    background: Theme.ok;
-                }
-                Text {
-                    text: status-text;
-                    font-size: 10px;
-                    font-family: "Menlo";
-                    color: Theme.muted;
-                    vertical-alignment: center;
-                    overflow: elide;
-                    horizontal-stretch: 1;
-                }
-                Text {
-                    text: provider-index == 0 ? "CODEX" : "CLAUDE DESKTOP";
-                    font-size: 9px;
-                    font-family: "Menlo";
-                    letter-spacing: 1px;
-                    color: Theme.faint;
-                    vertical-alignment: center;
-                }
+        Rectangle { height: 30px; background: Theme.panel;
+            HorizontalBox { padding-left: 18px; padding-right: 18px;
+                Text { text: status-text; color: Theme.muted; font-size: 11px; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+                Text { text: provider-index == 0 ? "CODEX" : "CLAUDE DESKTOP"; font-size: 10px; color: Theme.faint; vertical-alignment: center; }
             }
         }
     }
@@ -1573,9 +1035,9 @@ export component MainWindow inherits Window {
     if show-activity: Rectangle {
         z: 50;
         x: 0px;
-        y: 69px;
+        y: 49px;
         width: parent.width;
-        height: parent.height - 101px;
+        height: parent.height - 79px;
         background: Theme.bg;
 
         ScrollView {
@@ -1613,6 +1075,7 @@ export component MainWindow inherits Window {
                     }
                 }
 
+                if current-activity-error != "": Text { text: tr-cached + " · " + current-activity-error; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
                 if current-token-lifetime == "": Rectangle {
                     height: 430px;
                     border-radius: 14px;
@@ -1891,7 +1354,7 @@ export component MainWindow inherits Window {
                         background: Theme.copper;
                     }
                     Text {
-                        text: "GCSA 内部使用小工具";
+                        text: "GCSA · " + app-version;
                         font-size: 19px;
                         font-weight: 700;
                         color: Theme.text;

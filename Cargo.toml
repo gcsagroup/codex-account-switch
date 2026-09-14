@@ -1,6 +1,6 @@
 [package]
 name = "codex-account-switch"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
 rust-version = "1.92"
 description = "Cross-platform desktop app for switching Codex and Claude Desktop accounts"
@@ -11,9 +11,9 @@ publish = false
 [dependencies]
 arboard = "3"
 base64 = "0.22"
-chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
 fs4 = "0.13"
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls", "system-proxy"] }
 rfd = "0.15"
 rusqlite = { version = "0.40.2", default-features = false, features = ["backup", "bundled"] }
 serde = { version = "1", features = ["derive"] }
