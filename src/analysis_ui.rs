@@ -19,6 +19,7 @@ pub struct State {
     active: Option<(String, CacheKey)>,
     pending: HashSet<CacheKey>,
     editing_account: Option<String>,
+    attempted: HashMap<CacheKey, i64>,
 }
 
 pub fn connect(window: &MainWindow, shared: Arc<Mutex<AppShared>>) {
@@ -27,7 +28,7 @@ pub fn connect(window: &MainWindow, shared: Arc<Mutex<AppShared>>) {
     let state = Arc::clone(&shared);
     window.on_load_analysis(move |force| {
         if let Some(window) = weak.upgrade() {
-            load(&window, Arc::clone(&state), force);
+            load(&window, Arc::clone(&state), force, false);
         }
     });
     let weak = window.as_weak();
@@ -38,9 +39,13 @@ pub fn connect(window: &MainWindow, shared: Arc<Mutex<AppShared>>) {
     });
 }
 
-fn load(window: &MainWindow, shared: Arc<Mutex<AppShared>>, force: bool) {
+pub fn load_weekly(window: &MainWindow, shared: Arc<Mutex<AppShared>>) {
+    load(window, shared, false, true);
+}
+
+fn load(window: &MainWindow, shared: Arc<Mutex<AppShared>>, force: bool, weekly: bool) {
     let alias = window.get_current_alias().to_string();
-    let days = if window.get_analysis_range() == 0 {
+    let days = if weekly || window.get_analysis_range() == 0 {
         7
     } else {
         30
@@ -58,25 +63,35 @@ fn load(window: &MainWindow, shared: Arc<Mutex<AppShared>>, force: bool) {
                     (token, account)
                 }
                 _ => {
-                    state.analysis.active = None;
+                    if !weekly {
+                        state.analysis.active = None;
+                    }
                     clear(window, t(state.lang, "status.no_token"));
                     return;
                 }
             },
             Err(_) => {
-                state.analysis.active = None;
+                if !weekly {
+                    state.analysis.active = None;
+                }
                 clear(window, t(state.lang, "active.no_account"));
                 return;
             }
         };
         let key = (account, days, end);
-        if state.analysis.active.as_ref().map(|(_, k)| &k.0) != Some(&key.0) {
+        if !weekly && state.analysis.active.as_ref().map(|(_, k)| &k.0) != Some(&key.0) {
             window.set_val_editing(false);
             window.set_val_error("".into());
             state.analysis.editing_account = None;
         }
-        state.analysis.active = Some((alias, key.clone()));
+        if !weekly {
+            state.analysis.active = Some((alias, key.clone()));
+        }
         state.analysis.cache.retain(|(_, _, date), _| *date == end);
+        state
+            .analysis
+            .attempted
+            .retain(|(_, _, date), _| *date == end);
         let previous = state.analysis.cache.get(&key).cloned().unwrap_or_default();
         render_locked(window, &state);
         let fresh = [
@@ -97,9 +112,21 @@ fn load(window: &MainWindow, shared: Arc<Mutex<AppShared>>, force: bool) {
         ]
         .iter()
         .any(|error| !error.is_empty());
-        if (!force && fresh && !failed) || !state.analysis.pending.insert(key.clone()) {
+        // 自动卡片刷新也限制失败重试，避免个人账号不支持明细接口时反复请求。
+        let recently_attempted = state
+            .analysis
+            .attempted
+            .get(&key)
+            .is_some_and(|stamp| (0..60).contains(&(Utc::now().timestamp() - stamp)));
+        if (!force && ((fresh && !failed) || (weekly && recently_attempted)))
+            || !state.analysis.pending.insert(key.clone())
+        {
             return;
         }
+        state
+            .analysis
+            .attempted
+            .insert(key.clone(), Utc::now().timestamp());
         render_locked(window, &state);
         (token, key, previous)
     };
@@ -115,6 +142,107 @@ fn load(window: &MainWindow, shared: Arc<Mutex<AppShared>>, force: bool) {
             }
         });
     });
+}
+
+// 卡片固定统计最近七个 UTC 日期，与分析页的 7/30 天选择互不干扰。
+fn weekly_totals(
+    snapshot: &Snapshot,
+    end: NaiveDate,
+    assumption: &crate::valuation::Assumptions,
+) -> (
+    crate::valuation::TokenSeries,
+    crate::model_valuation::AutomaticCost,
+) {
+    let dates = analytics::dates(end, 7);
+    let empty = crate::usage::TokenUsageProfile::default();
+    let mut series =
+        crate::valuation::token_series(snapshot.tokens.data.as_ref().unwrap_or(&empty), &dates);
+    crate::model_valuation::merge_reported_totals(
+        &mut series,
+        &dates,
+        snapshot.detailed_tokens.data.as_ref(),
+    );
+    let cost = crate::model_valuation::calculate(
+        &dates,
+        &series,
+        snapshot.detailed_tokens.data.as_ref(),
+        snapshot.activity.data.as_ref(),
+        assumption,
+    );
+    (series, cost)
+}
+
+fn render_weekly(window: &MainWindow, state: &AppShared) {
+    let lang = state.lang;
+    window.set_weekly_token_title(t(lang, "weekly.tokens").into());
+    window.set_weekly_value_title(t(lang, "val.auto_value").into());
+    window.set_weekly_tokens("—".into());
+    window.set_weekly_value("—".into());
+    window.set_weekly_note(t(lang, "weekly.scope").into());
+    let account = state
+        .codex
+        .store()
+        .read_profile_creds(&window.get_current_alias())
+        .ok()
+        .and_then(|c| c.account_id);
+    let Some(account) = account.filter(|_| state.provider == Provider::Codex) else {
+        return;
+    };
+    let end = Utc::now().date_naive();
+    let key = (account.clone(), 7, end);
+    let empty = Snapshot::default();
+    let snapshot = state.analysis.cache.get(&key).unwrap_or(&empty);
+    let busy = state.analysis.pending.contains(&key);
+    let settings = crate::valuation::read_settings(&crate::valuation::settings_path());
+    let assumption = crate::valuation::effective_assumption(
+        settings.as_ref().ok().and_then(|s| s.get(&account)),
+    );
+    let (series, cost) = weekly_totals(snapshot, end, &assumption);
+    window.set_weekly_tokens(
+        series
+            .total
+            .map(|n| number(n as f64))
+            .unwrap_or_else(|| "—".into())
+            .into(),
+    );
+    if settings.is_ok() {
+        window.set_weekly_value(
+            cost.total
+                .map(|v| format!("≈ {}", crate::valuation::money(v)))
+                .unwrap_or_else(|| "—".into())
+                .into(),
+        );
+    }
+    let summary = t(lang, "val.auto_summary")
+        .replace("{exact}", &cost.exact_days.to_string())
+        .replace("{estimated}", &cost.estimated_days.to_string())
+        .replace("{priced}", &number(cost.priced_tokens))
+        .replace("{unpriced}", &number(cost.unpriced_tokens));
+    let coverage = t(lang, "val.coverage")
+        .replace("{n}", &series.covered.to_string())
+        .replace("{days}", "7");
+    let status = [
+        panel_message(&snapshot.tokens, lang, busy),
+        panel_message(&snapshot.activity, lang, busy),
+    ]
+    .join(" · ");
+    window.set_weekly_note(
+        format!(
+            "{} — {} · UTC · {}\n{}\n{}\n{}{}",
+            analytics::dates(end, 7)[0],
+            end,
+            t(lang, "weekly.scope"),
+            coverage,
+            summary,
+            status,
+            if settings.is_err() {
+                format!(" · {}", t(lang, "val.storage_error"))
+            } else {
+                String::new()
+            }
+        )
+        .into(),
+    );
 }
 
 fn clear(window: &MainWindow, message: &str) {
@@ -137,6 +265,7 @@ fn clear(window: &MainWindow, message: &str) {
 }
 
 pub fn render_locked(window: &MainWindow, state: &AppShared) {
+    render_weekly(window, state);
     let lang = state.lang;
     let Some((alias, key)) = &state.analysis.active else {
         clear(window, t(lang, "activity.no_data"));
@@ -836,6 +965,90 @@ fn render_valuation(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn weekly_value_filters_dates_and_prices_each_reported_model() {
+        let end = NaiveDate::from_ymd_opt(2026, 9, 16).unwrap();
+        let mut snapshot = Snapshot::default();
+        let row = |date: &str, name: &str| {
+            serde_json::json!({
+                "date": date, "models": [{"model": name,
+                "uncached_text_input_tokens": 1_000_000,
+                "cached_text_input_tokens": 0, "text_output_tokens": 0}]
+            })
+        };
+        snapshot.detailed_tokens.data = Some(
+            serde_json::from_value(serde_json::json!({"data": [
+                row("2026-09-09", "gpt-6-sol"), row("2026-09-10", "gpt-6-astra"),
+                row("2026-09-16", "gpt-5.5"), row("2026-09-17", "gpt-5.5")
+            ]}))
+            .unwrap(),
+        );
+        let (series, cost) = weekly_totals(
+            &snapshot,
+            end,
+            &crate::valuation::effective_assumption(None),
+        );
+        assert_eq!(series.daily.len(), 7);
+        assert_eq!(series.covered, 2);
+        assert_eq!(series.total, Some(2_000_000));
+        assert_eq!(cost.total, Some(15.));
+        assert_eq!(cost.exact_days, 2);
+        assert_eq!(cost.estimated_days, 0);
+    }
+
+    #[test]
+    fn weekly_missing_and_unknown_models_are_not_zero_cost() {
+        let end = NaiveDate::from_ymd_opt(2026, 9, 16).unwrap();
+        let mut snapshot = Snapshot::default();
+        let assumption = crate::valuation::effective_assumption(None);
+        let (series, cost) = weekly_totals(&snapshot, end, &assumption);
+        assert_eq!(series.total, None);
+        assert_eq!(cost.total, None);
+        snapshot.detailed_tokens.data = Some(serde_json::from_value(serde_json::json!({"data":[{
+            "date":"2026-09-16", "models":[{"model":"unknown",
+            "uncached_text_input_tokens":1000,"cached_text_input_tokens":0,"text_output_tokens":0}]
+        }]})).unwrap());
+        let (series, cost) = weekly_totals(&snapshot, end, &assumption);
+        assert_eq!(series.total, Some(1000));
+        assert_eq!(cost.total, None);
+        assert_eq!(cost.unpriced_tokens, 1000.);
+    }
+
+    #[test]
+    fn weekly_personal_usage_uses_only_same_day_model_activity() {
+        let end = NaiveDate::from_ymd_opt(2026, 9, 16).unwrap();
+        let mut snapshot = Snapshot::default();
+        snapshot.tokens.data = Some(crate::usage::TokenUsageProfile {
+            daily_usage_buckets: Some(vec![
+                crate::usage::TokenUsageDailyBucket {
+                    start_date: "2026-09-15".into(),
+                    tokens: 1_000_000,
+                },
+                crate::usage::TokenUsageDailyBucket {
+                    start_date: "2026-09-16".into(),
+                    tokens: 1_000_000,
+                },
+            ]),
+            ..Default::default()
+        });
+        snapshot.activity.data = Some(
+            serde_json::from_value(serde_json::json!({"data":[{
+                "date":"2026-09-16","totals":{"turns":2},"models":[
+                    {"model":"gpt-6-astra","turns":1},{"model":"gpt-5.5","turns":1}]
+            }]}))
+            .unwrap(),
+        );
+        let (series, cost) = weekly_totals(
+            &snapshot,
+            end,
+            &crate::valuation::effective_assumption(None),
+        );
+        assert_eq!(series.total, Some(2_000_000));
+        assert_eq!(cost.estimated_days, 1);
+        assert_eq!(cost.unpriced_tokens, 1_000_000.);
+        assert!((cost.total.unwrap() - 11.3).abs() < 0.000001);
+    }
 
     #[test]
     fn late_response_cannot_replace_another_account_or_range() {

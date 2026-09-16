@@ -8,10 +8,17 @@ Codex Account Switch 是一个本地原生桌面工具，用于保存、预览�
 
 ## 项目状态
 
-- 版本：[v1.2.0 测试预发布版](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.2.0)，Ver 1.2 (14)，2026-09-16。
+- 版本：[v1.3.0 测试预发布版](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.3.0)，Ver 1.3 (19)，2026-09-16。
 - macOS：已完成本机 arm64 App 构建和真实窗口验收；已用 Global Cybersecurity Alliance Limited 的 Apple Distribution 证书签名；未经过 Developer ID 签名及 Apple 公证，Gatekeeper 可能拒绝打开；本版为测试预发布。
 - Windows：本次不提供下载，尚未完成真机端到端验收；CI 构建不等同于实际使用验证。
 - Linux：当前不属于支持或发布验收范围。
+
+### 重置时间与推荐次序（Ver 1.3 (19)）
+
+- 账户展开区新增近 7 天 Token 合计和自动按模型计算的 API 等价估算。统计包含今日的 7 个 UTC 日期，明确日期范围、覆盖天数、官方分类／分摊天数和未计价量；不冒充按小时重置的额度周期。复用分析缓存，后台加载，失败保留成功数据，账号隔离。
+- Codex 账户无论折叠还是展开，都显示下次每周／5 小时窗口重置时间。重置时间已到时显示「待刷新」，不会直接当成额度已经恢复。
+- 可用账户按每周重置时间从早到晚推荐；没有周窗口时使用短窗口。时间相同则剩余额度多的优先，最后按账户别名稳定排序。耗尽账户另列恢复次序；若多个窗口都耗尽，取这些窗口中较晚的恢复时间。
+- 重置时间未知的排在后面；无效账户、刷新失败、窗口已到期或超过 15 分钟的缓存不推荐。建议随额度刷新更新，卡片位置不跳动；不会自动切换账户或消耗重置次数。
 
 ### 自动模型计价与重置历史（Ver 1.2）
 
@@ -139,7 +146,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
 ```
 
-当前基线为 57 项测试，覆盖身份解析、导入、权限、可恢复删除、事务切换、详情预览、Claude SQLite、额度窗口、重置次数和活动解析。
+当前基线为 64 项测试，覆盖身份解析、导入、权限、可恢复删除、事务切换、详情预览、Claude SQLite、额度窗口、重置次数和活动解析。
 
 ## 安全与发布边界
 

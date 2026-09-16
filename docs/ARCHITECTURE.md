@@ -31,6 +31,7 @@ Local files, ChatGPT endpoints, Codex/Claude desktop processes
 - `src/valuation.rs`: official price snapshot, token date coverage and per-account fallback assumptions.
 - `src/model_valuation.rs`: reported token categories first; daily turn-based fallback is explicitly estimated. Unknown prices are excluded; no cross-account local logs.
 - `src/reset_history.rs`: read-only history pagination, cursor guards, deduplication and private per-account persistent cache; replace only after all pages succeed.
+- `src/account_order.rs`: quota availability, weekly reset priority, multi-window recovery order and localized card summaries; recommendations never mutate accounts.
 - `src/analysis_ui.rs`: account/date-isolated cache, asynchronous response checks, and analytics view models.
 - `src/usage.rs`: usage/activity requests, window classification, reset times, cache, and formatting.
 - `src/claude.rs`: Claude Cookies profiles, SQLite backup/validation, switching, restart, trash, and recovery.
@@ -74,6 +75,7 @@ Local files, ChatGPT endpoints, Codex/Claude desktop processes
 - A successful usage request does not erase the last activity snapshot when the activity request fails.
 - The UI fills the daily series to a 52-by-7 heatmap and derives weekly/cumulative trend points.
 - Single-flight refresh prevents duplicate work. The active account refreshes every minute; all accounts refresh periodically and on demand.
+- Expanded accounts show Token totals and automatic per-model API-equivalent estimates for the last 7 UTC dates, including today. Dates, coverage, exact/estimated days and unpriced tokens remain visible; this is not the hourly quota-reset cycle. Loading shares the analysis cache, runs in the background, preserves successful data on failure and stays account-scoped.
 
 ## Concurrency and lifecycle
 

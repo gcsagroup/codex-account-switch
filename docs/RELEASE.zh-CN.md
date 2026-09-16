@@ -4,13 +4,15 @@
 
 本文说明当前源码中实际存在的构建脚本和发布门槛。本地或 CI 构建成功，不等于已经形成可正式对外发布的签名产物。
 
-## v1.2.0 测试预发布（2026-09-16）
+## v1.3.0 测试预发布（2026-09-16）
 
-macOS 13+、Apple 芯片（arm64），构建号 14。包使用 Apple Distribution: Global Cybersecurity Alliance Limited 签名；未使用 Developer ID、未公证，Gatekeeper 可能拒绝打开。本版不附 Windows 或 Intel Mac 原生二进制。
+macOS 13+、Apple 芯片（arm64），构建号 19。包使用 Apple Distribution: Global Cybersecurity Alliance Limited 签名；未使用 Developer ID、未公证，Gatekeeper 可能拒绝打开。本版不附 Windows 或 Intel Mac 原生二进制。
 
-[下载 v1.2.0](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.2.0)。附件包含签名 App ZIP、`SHA256SUMS.txt` 和 `SOURCE_SHA256SUMS.txt`，App 内含许可证与第三方声明。价格使用 2026-09-16 核验的官方快照；按轮次分摊的估值不是账单。
+[下载 v1.3.0](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.3.0)。附件包含签名 App ZIP、`SHA256SUMS.txt` 和 `SOURCE_SHA256SUMS.txt`，App 内含许可证与第三方声明。价格使用 2026-09-16 核验的官方快照；按轮次分摊的估值不是账单。
 
-源码与标签由 SSH 身份 GCSA-ToolsTeam 推送。已签名原包放在独立的 `codex/release-assets-v1.2.0` 发布分支；标签触发的 CI 发布任务固定该分支的提交 SHA，等待两个平台检查通过，再验证源码指纹、安装包校验和、版本、arm64 架构和公司签名，使用仓库工作流令牌发布同一原包。签名私钥不上传。可用 `bash scripts/verify-release-macos.sh dist/releases/v1.2.0` 在本地执行相同包校验。
+源码与标签由 SSH 身份 GCSA-ToolsTeam 推送。已签名原包放在独立的 `codex/release-assets-v1.3.0` 发布分支；标签触发的 CI 发布任务固定该分支的提交 SHA，等待两个平台检查通过，再验证源码指纹、安装包校验和、版本、arm64 架构和公司签名，使用仓库工作流令牌发布同一原包。签名私钥不上传。可用 `bash scripts/verify-release-macos.sh dist/releases/v1.3.0` 在本地执行相同包校验。
+
+本次新增账户下次重置时间、推荐使用次序与近 7 天 Token 等价价值；64 项测试及原生账户卡片与分析页对照验证通过。
 
 ## 工具链
 
@@ -129,4 +131,4 @@ shasum -a 256 -c codex-account-switch-windows-x86.exe.sha256
 
 - macOS App 尚未通过 Developer ID 签名和 Apple 公证。
 - Windows 可执行文件尚未完成代码签名和 x64/x86 真机冒烟测试。
-- `v1.2.0` 为 GitHub 测试预发布，尚不是通过上述门槛的稳定版。
+- `v1.3.0` 为 GitHub 测试预发布，尚不是通过上述门槛的稳定版。

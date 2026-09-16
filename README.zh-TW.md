@@ -8,10 +8,17 @@ Codex Account Switch 是本機原生桌面工具，用於儲存、預覽、切�
 
 ## 專案狀態
 
-- 版本：[v1.2.0 測試預發布版](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.2.0)，Ver 1.2 (14)，2026-09-16。
+- 版本：[v1.3.0 測試預發布版](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.3.0)，Ver 1.3 (19)，2026-09-16。
 - macOS：已完成本機 arm64 App 建置及真實視窗驗收；已使用 Global Cybersecurity Alliance Limited 的 Apple Distribution 憑證簽署；未經 Developer ID 簽章及 Apple 公證；Gatekeeper 可能拒絕開啟，本版為測試預發布。
 - Windows：本次不提供下載，尚未完成實機端到端驗收；CI 建置不等同於實際使用驗證。
 - Linux：目前不在支援或發布驗收範圍內。
+
+### 重置時間與推薦次序（Ver 1.3 (19)）
+
+- 帳戶展開區新增近 7 天 Token 合計與自動按模型計算的 API 等價估算。統計包含今日的 7 個 UTC 日期，標示日期範圍、覆蓋天數、官方分類／分攤天數與未計價量；不等同於按小時重設的額度週期。共用分析快取，背景載入，失敗保留成功資料，帳戶隔離。
+- Codex 帳戶無論收合或展開，都顯示下次每週／5 小時視窗重置時間。時間已到時顯示「待更新」，不直接當成額度已恢復。
+- 可用帳戶依每週重置時間由早到晚推薦；沒有週視窗時採用短視窗。同時間以剩餘額度多者優先，最後依帳戶別名穩定排序。耗盡帳戶另列恢復次序；若多個視窗都耗盡，採用其中較晚的恢復時間。
+- 重置時間未知者排後；無效帳戶、更新失敗、視窗到期或超過 15 分鐘的快取不推薦。建議隨額度更新，卡片位置不跳動；不自動切換帳戶或消耗重置次數。
 
 ### 自動模型計價與重置歷史（Ver 1.2）
 
@@ -139,7 +146,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
 ```
 
-目前基準為 57 項測試，涵蓋身分解析、匯入、權限、可復原刪除、交易式切換、詳情預覽、Claude SQLite、額度視窗、重設次數與活動解析。
+目前基準為 64 項測試，涵蓋身分解析、匯入、權限、可復原刪除、交易式切換、詳情預覽、Claude SQLite、額度視窗、重設次數與活動解析。
 
 ## 安全與發布邊界
 

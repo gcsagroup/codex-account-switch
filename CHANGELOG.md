@@ -4,6 +4,15 @@
 
 This log records source changes and local verification; a Git tag does not imply a published GitHub Release.
 
+## 1.3.0 - 2026-09-16 (testing prerelease)
+
+- Expanded accounts show Token totals and automatic per-model API-equivalent estimates for the last 7 UTC dates, including today. Dates, coverage, exact/estimated days and unpriced tokens remain visible; this is not the hourly quota-reset cycle. Loading shares the analysis cache, runs in the background, preserves successful data on failure and stays account-scoped.
+- Collapsed and expanded Codex account cards both show the next weekly and five-hour reset times. Passed deadlines are labeled as awaiting refresh, not as a confirmed fresh quota.
+- Available accounts are suggested by earliest weekly reset (short-window reset when no weekly limit exists), then greater remaining quota, then alias. Exhausted accounts have a separate recovery order: all exhausted windows must reset before an account can recover.
+- Unknown reset times come last. Invalid profiles, failed requests, expired windows and snapshots older than 15 minutes are not recommended. Recommendations update with usage refreshes; card positions remain stable and the app does not switch accounts or consume reset credits automatically.
+
+- macOS arm64 build 19, signed by Global Cybersecurity Alliance Limited. All 64 local tests and native-window acceptance passed. The release workflow publishes the ZIP, checksum and source fingerprints after both platform CI jobs and package validation pass. Not notarized; no Windows binaries.
+
 ## 1.2.0 - 2026-09-16 (testing prerelease)
 
 - Automatic mode prices the models actually reported for the account. When the official API supplies uncached input, cached input and output tokens by model, these are priced separately. Otherwise, each day’s total is apportioned by model turn counts and explicitly labeled as an estimate. Turn shares can differ substantially from token shares.

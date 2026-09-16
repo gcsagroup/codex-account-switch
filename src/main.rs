@@ -1,5 +1,6 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+mod account_order;
 mod analysis_ui;
 mod analytics;
 mod claude;
@@ -1427,6 +1428,21 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
     window.set_current_usage_stamp(SharedString::new());
     analysis_ui::localize(window, lang);
 
+    let advice: Vec<_> = profiles
+        .iter()
+        .map(|p| {
+            (
+                p.alias.clone(),
+                account_order::evaluate(p.is_valid, state.usage.get(&p.alias), now),
+            )
+        })
+        .collect();
+    window.set_account_order_rule(i18n::t(lang, "order.rule").into());
+    window.set_account_order_summary(if supports_usage && !profiles.is_empty() {
+        account_order::summary(&advice, lang).into()
+    } else {
+        SharedString::new()
+    });
     let rows: Vec<AccountRow> = profiles
         .iter()
         .map(|p| {
@@ -1473,6 +1489,16 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
                     lang,
                 )
                 .into(),
+                reset_summary: if supports_usage {
+                    account_order::reset_summary(snap, now, lang).into()
+                } else {
+                    SharedString::new()
+                },
+                recommendation: if supports_usage {
+                    account_order::row_label(&p.alias, &advice, lang).into()
+                } else {
+                    SharedString::new()
+                },
                 usage_summary: usage_summary.into(),
                 usage_updated: snap
                     .map(|s| {
@@ -1945,6 +1971,8 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
             "Codex".into()
         });
     }
+    drop(state);
+    analysis_ui::load_weekly(window, Arc::clone(shared));
 }
 
 fn resolve_detail_alias(

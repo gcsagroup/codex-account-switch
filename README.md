@@ -8,10 +8,17 @@ Built with **Rust 1.97.1**, **Slint 1.17**, and bundled SQLite. The UI does not 
 
 ## Project status
 
-- Version: [v1.2.0 testing prerelease](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.2.0), Ver 1.2 (14), 2026-09-16.
+- Version: [v1.3.0 testing prerelease](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.3.0), Ver 1.3 (19), 2026-09-16.
 - macOS: local arm64 App build and real-window validation completed; signed locally with Apple Distribution: Global Cybersecurity Alliance Limited; not Developer ID signed or notarized. This is a testing prerelease; Gatekeeper may reject it.
 - Windows: no binaries are included in this release; native end-to-end acceptance remains pending. CI build results do not replace real-device testing.
 - Linux: not currently supported or release-tested.
+
+### Account reset times and suggested order (Ver 1.3 (19))
+
+- Expanded accounts show Token totals and automatic per-model API-equivalent estimates for the last 7 UTC dates, including today. Dates, coverage, exact/estimated days and unpriced tokens remain visible; this is not the hourly quota-reset cycle. Loading shares the analysis cache, runs in the background, preserves successful data on failure and stays account-scoped.
+- Collapsed and expanded Codex account cards both show the next weekly and five-hour reset times. Passed deadlines are labeled as awaiting refresh, not as a confirmed fresh quota.
+- Available accounts are suggested by earliest weekly reset (short-window reset when no weekly limit exists), then greater remaining quota, then alias. Exhausted accounts have a separate recovery order: all exhausted windows must reset before an account can recover.
+- Unknown reset times come last. Invalid profiles, failed requests, expired windows and snapshots older than 15 minutes are not recommended. Recommendations update with usage refreshes; card positions remain stable and the app does not switch accounts or consume reset credits automatically.
 
 ### Automatic model valuation and reset history (Ver 1.2)
 
@@ -140,7 +147,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
 ```
 
-The current baseline is 57 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
+The current baseline is 64 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
 
 ## Security and release boundary
 

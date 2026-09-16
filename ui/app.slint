@@ -39,6 +39,8 @@ export struct AccountRow {
     credits: string,
     reset_credits: string,
     usage_summary: string,
+    reset_summary: string,
+    recommendation: string,
     usage_updated: string,
     usage_attention: bool,
     usage_error: string,
@@ -354,6 +356,8 @@ export component MainWindow inherits Window {
     background: Theme.bg;
 
     in-out property <[AccountRow]> accounts: [];
+    in-out property <string> account-order-summary;
+    in-out property <string> account-order-rule;
     in-out property <string> status-text: "Ready";
     in-out property <string> active-alias: "";
     in-out property <string> current-alias: "";
@@ -401,6 +405,11 @@ export component MainWindow inherits Window {
     in-out property <string> usage-notice;
     in-out property <bool> current-stale: false;
     in-out property <string> current-usage-stamp;
+    in-out property <string> weekly-token-title;
+    in-out property <string> weekly-value-title;
+    in-out property <string> weekly-tokens;
+    in-out property <string> weekly-value;
+    in-out property <string> weekly-note;
     in-out property <string> current-activity-error;
     private property <int> page-index: 0;
     changed page-index => { content-scroll.viewport-y = 0px; }
@@ -838,6 +847,10 @@ export component MainWindow inherits Window {
                             GhostButton { label: tr-btn-refresh-list; clicked => { root.refresh(); } }
                             if provider-index == 0: GhostButton { label: usage-busy ? tr-loading : tr-btn-refresh-usage; enabled: !usage-busy; clicked => { root.refresh-usage(); } }
                         }
+                        if provider-index == 0 && account-order-summary != "": VerticalBox { spacing: 7px;
+                            Text { text: account-order-summary; font-size: 13px; color: Theme.text; wrap: word-wrap; }
+                            Text { text: account-order-rule; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
+                        }
                         if accounts.length == 0: Text { text: tr-profiles-empty + "\n" + tr-profiles-empty-hint; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
                         for acc in root.accounts: account-row := Rectangle {
                             private property <bool> expanded: false;
@@ -870,6 +883,10 @@ export component MainWindow inherits Window {
                                     if provider-index == 0: GhostButton { label: tr-nav-analysis; clicked => { root.preview-account(acc.alias); page-index = 1; root.load-analysis(false); } }
                                     GhostButton { label: tr-more; solid: account-row.expanded; clicked => { account-row.expanded = !account-row.expanded; } }
                                 }
+                                if provider-index == 0: VerticalBox { spacing: 5px;
+                                    Text { text: acc.reset_summary; font-size: 12px; color: Theme.text; wrap: word-wrap; }
+                                    Text { text: acc.recommendation; font-size: 11px; color: Theme.copper; wrap: word-wrap; }
+                                }
                                 if account-row.details: VerticalBox {
                                     spacing: 14px;
                                     Rectangle { height: 1px; background: Theme.line; }
@@ -893,6 +910,20 @@ export component MainWindow inherits Window {
                                             GhostButton { label: tr-reset-history; clicked => { account-row.history-open = !account-row.history-open; if account-row.history-open { root.load-reset-history(false); } } }
                                             Text { text: "Credits  " + (current-credits == "" ? "—" : current-credits); color: Theme.muted; font-size: 12px; }
                                         }
+                                    }
+                                    if provider-index == 0: VerticalBox { spacing: 8px;
+                                        Rectangle { height: 1px; background: Theme.line; }
+                                        HorizontalBox { spacing: 24px;
+                                            VerticalBox { spacing: 4px;
+                                                Text { text: weekly-token-title; color: Theme.muted; font-size: 12px; }
+                                                Text { text: weekly-tokens; color: Theme.text; font-size: 22px; font-weight: 600; }
+                                            }
+                                            VerticalBox { spacing: 4px;
+                                                Text { text: weekly-value-title; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                                                Text { text: weekly-value; color: Theme.copper; font-size: 22px; font-weight: 600; }
+                                            }
+                                        }
+                                        Text { text: weekly-note; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
                                     }
                                     if provider-index == 0 && account-row.history-open: VerticalBox { spacing: 10px;
                                         Rectangle { height: 1px; background: Theme.line; }

@@ -4,13 +4,15 @@
 
 This guide describes the build scripts and release gates that exist in the current source tree. A successful local or CI build is not, by itself, a signed and supported public release.
 
-## v1.2.0 testing prerelease (2026-09-16)
+## v1.3.0 testing prerelease (2026-09-16)
 
-macOS 13+ Apple silicon (arm64), build 14. Signed with Apple Distribution: Global Cybersecurity Alliance Limited. Not Developer ID signed or notarized; Gatekeeper may reject it. No Windows or native Intel Mac binaries are included.
+macOS 13+ Apple silicon (arm64), build 19. Signed with Apple Distribution: Global Cybersecurity Alliance Limited. Not Developer ID signed or notarized; Gatekeeper may reject it. No Windows or native Intel Mac binaries are included.
 
-[Download v1.2.0](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.2.0). Assets: signed App ZIP, `SHA256SUMS.txt` and `SOURCE_SHA256SUMS.txt`. The App includes its license and third-party notices. Prices use the official snapshot verified on 2026-09-16. Model turn-based estimates are not billing data.
+[Download v1.3.0](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.3.0). Assets: signed App ZIP, `SHA256SUMS.txt` and `SOURCE_SHA256SUMS.txt`. The App includes its license and third-party notices. Prices use the official snapshot verified on 2026-09-16. Model turn-based estimates are not billing data.
 
-The SSH identity GCSA-ToolsTeam pushes the source and tag. The already signed package is held in the dedicated `codex/release-assets-v1.2.0` branch. The tag-triggered CI release job pins its immutable commit, waits for both platform checks, validates source fingerprints, package checksum, version, arm64 architecture and company signature, then publishes the same package using the repository workflow token. No signing private key is uploaded. Run `bash scripts/verify-release-macos.sh dist/releases/v1.2.0` for the same local package checks.
+The SSH identity GCSA-ToolsTeam pushes the source and tag. The already signed package is held in the dedicated `codex/release-assets-v1.3.0` branch. The tag-triggered CI release job pins its immutable commit, waits for both platform checks, validates source fingerprints, package checksum, version, arm64 architecture and company signature, then publishes the same package using the repository workflow token. No signing private key is uploaded. Run `bash scripts/verify-release-macos.sh dist/releases/v1.3.0` for the same local package checks.
+
+This release adds next reset times, suggested account order and seven-day Token-equivalent value. All 64 tests and native account-card versus analytics checks passed.
 
 ## Toolchain
 
