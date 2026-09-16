@@ -304,6 +304,8 @@ component TextArea inherits Rectangle {
 export struct AnalysisSegment { fraction: float, offset: float, color-index: int }
 export struct AnalysisBar { label: string, detail: string, segments: [AnalysisSegment] }
 export struct AnalysisLegend { name: string, color-index: int }
+export struct HistoryRow { title: string, time: string }
+export struct ValuationRow { model: string, detail: string, cost: string }
 export struct AnalysisRank { name: string, value: string, ratio: float }
 
 component RankingPanel inherits Rectangle {
@@ -425,6 +427,18 @@ export component MainWindow inherits Window {
     in-out property <[AnalysisLegend]> analysis-legend;
     in-out property <[AnalysisRank]> analysis-activity-rows;
     in-out property <[AnalysisRank]> analysis-tool-rows;
+    in-out property <string> tr-reset-history;
+    in-out property <string> reset-history-status;
+    in-out property <string> reset-history-window;
+    in-out property <bool> reset-history-busy;
+    in-out property <[HistoryRow]> reset-history-rows;
+    callback load-reset-history(bool);
+    in-out property <bool> val-automatic: true;
+    in-out property <string> tr-val-auto;
+    in-out property <string> tr-val-auto-value;
+    in-out property <string> tr-val-manual;
+    in-out property <string> val-auto-status;
+    in-out property <[ValuationRow]> val-model-rows;
     in-out property <bool> val-available: false;
     in-out property <bool> val-editing: false;
     in-out property <string> val-total;
@@ -827,6 +841,8 @@ export component MainWindow inherits Window {
                         if accounts.length == 0: Text { text: tr-profiles-empty + "\n" + tr-profiles-empty-hint; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
                         for acc in root.accounts: account-row := Rectangle {
                             private property <bool> expanded: false;
+                            private property <bool> history-open: false;
+                            changed details => { if !self.details { self.history-open = false; } }
                             private property <bool> details: root.expanded-account == acc.alias && root.current-alias == acc.alias;
                             vertical-stretch: 0;
                             background: Theme.panel;
@@ -874,7 +890,23 @@ export component MainWindow inherits Window {
                                         }
                                         VerticalBox { spacing: 9px; horizontal-stretch: 1;
                                             Text { text: current-reset-credits; font-size: 12px; color: Theme.copper; wrap: word-wrap; }
+                                            GhostButton { label: tr-reset-history; clicked => { account-row.history-open = !account-row.history-open; if account-row.history-open { root.load-reset-history(false); } } }
                                             Text { text: "Credits  " + (current-credits == "" ? "—" : current-credits); color: Theme.muted; font-size: 12px; }
+                                        }
+                                    }
+                                    if provider-index == 0 && account-row.history-open: VerticalBox { spacing: 10px;
+                                        Rectangle { height: 1px; background: Theme.line; }
+                                        HorizontalBox {
+                                            Text { text: tr-reset-history + " · " + reset-history-window; font-size: 13px; color: Theme.text; horizontal-stretch: 1; }
+                                            GhostButton { label: reset-history-busy ? tr-loading : tr-reset-history + " ↻"; enabled: !reset-history-busy; clicked => { root.load-reset-history(true); } }
+                                        }
+                                        Text { text: reset-history-status; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
+                                        for event in reset-history-rows: VerticalBox { spacing: 8px;
+                                            HorizontalBox {
+                                                Text { text: event.title; color: Theme.text; font-size: 12px; horizontal-stretch: 1; }
+                                                Text { text: event.time; color: Theme.muted; font-size: 11px; }
+                                            }
+                                            Rectangle { height: 1px; background: Theme.line; }
                                         }
                                     }
                                     Text { text: provider-index == 0 ? current-usage-stamp : tr-claude-session-hint; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
@@ -915,16 +947,31 @@ export component MainWindow inherits Window {
                                         Text { text: val-total; font-size: 25px; font-weight: 600; color: Theme.text; overflow: elide; }
                                     }
                                     VerticalBox { horizontal-stretch: 1; spacing: 5px;
-                                        Text { text: val-text.value; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
+                                        Text { text: val-automatic ? tr-val-auto-value : val-text.value; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
                                         Text { text: val-cost; font-size: 25px; font-weight: 600; color: Theme.copper; overflow: elide; }
                                     }
                                 }
                                 Text { text: val-coverage; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
                                 Text { text: val-message; font-size: 11px; color: Theme.copper; wrap: word-wrap; }
+                                HorizontalBox { spacing: 10px;
+                                    GhostButton { label: tr-val-auto; solid: val-automatic; clicked => { val-automatic = true; val-editing = false; root.update-analysis(); } }
+                                    GhostButton { label: tr-val-manual; solid: !val-automatic; clicked => { val-automatic = false; root.update-analysis(); } }
+                                }
+                                if val-automatic: Text { text: val-auto-status; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
+                                if val-automatic: VerticalBox { spacing: 12px;
+                                    for row in val-model-rows: VerticalBox { spacing: 5px;
+                                        HorizontalBox {
+                                            Text { text: row.model; font-size: 12px; color: Theme.text; horizontal-stretch: 1; }
+                                            Text { text: row.cost; font-size: 13px; color: Theme.copper; }
+                                        }
+                                        Text { text: row.detail; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
+                                        Rectangle { height: 1px; background: Theme.line; }
+                                    }
+                                }
                                 Text { text: val-basis; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
                                 HorizontalBox { spacing: 12px;
-                                    Text { text: val-text.model; font-size: 12px; color: Theme.muted; vertical-alignment: center; }
-                                    ComboBox { horizontal-stretch: 1; model: val-models; current-index <=> val-model-index; enabled: val-available; selected(value) => { root.select-valuation-model(self.current-index); } }
+                                    Text { visible: !val-automatic; text: val-text.model; font-size: 12px; color: Theme.muted; vertical-alignment: center; }
+                                    ComboBox { visible: !val-automatic; horizontal-stretch: 1; model: val-models; current-index <=> val-model-index; enabled: val-available; selected(value) => { root.select-valuation-model(self.current-index); } }
                                     GhostButton { label: val-text.configure; enabled: val-available; clicked => { root.begin-valuation(); } }
                                 }
                                 if val-error != "": Text { text: val-error; color: Theme.danger; font-size: 12px; wrap: word-wrap; }

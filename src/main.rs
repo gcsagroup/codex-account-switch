@@ -6,8 +6,10 @@ mod claude;
 mod error;
 mod identity;
 mod login;
+mod model_valuation;
 mod paths;
 mod profile;
+mod reset_history;
 mod restart;
 mod switcher;
 mod usage;
@@ -52,6 +54,7 @@ struct AppShared {
     usage_refreshing: Arc<AtomicBool>,
     lang: i18n::Language,
     analysis: analysis_ui::State,
+    reset_history: reset_history::State,
 }
 
 impl AppShared {
@@ -164,6 +167,7 @@ fn run_app() -> Result<(), Box<dyn std::error::Error>> {
         usage_refreshing: Arc::new(AtomicBool::new(false)),
         lang,
         analysis: analysis_ui::State::default(),
+        reset_history: reset_history::State::default(),
     }));
     let running = Arc::new(AtomicBool::new(true));
 
@@ -172,6 +176,7 @@ fn run_app() -> Result<(), Box<dyn std::error::Error>> {
         .set_app_version(concat!("Ver ", env!("APP_VERSION"), " (", env!("APP_BUILD"), ")").into());
     let tray = AppTray::new()?;
     analysis_ui::connect(&window, Arc::clone(&shared));
+    reset_history::connect(&window, Arc::clone(&shared));
 
     // Set initial language index in UI
     window.set_lang_index(match lang {
@@ -1888,6 +1893,7 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
     }
 
     analysis_ui::render_locked(window, &state);
+    reset_history::render_locked(window, &state);
 
     if let Some(active) = profiles
         .iter()

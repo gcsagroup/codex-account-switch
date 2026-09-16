@@ -8,19 +8,20 @@ Codex Account Switch 是本機原生桌面工具，用於儲存、預覽、切�
 
 ## 專案狀態
 
-- 版本：[`v1.1.0` 預發布版](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.1.0)，2026-09-15。
+- 版本：[v1.2.0 測試預發布版](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.2.0)，Ver 1.2 (14)，2026-09-16。
 - macOS：已完成本機 arm64 App 建置及真實視窗驗收；已使用 Global Cybersecurity Alliance Limited 的 Apple Distribution 憑證簽署；未經 Developer ID 簽章及 Apple 公證；Gatekeeper 可能拒絕開啟，本版為測試預發布。
 - Windows：本次不提供下載，尚未完成實機端到端驗收；CI 建置不等同於實際使用驗證。
 - Linux：目前不在支援或發布驗收範圍內。
 
-### 帳號卡片與 Token 估值（Ver 1.1）
+### 自動模型計價與重置歷史（Ver 1.2）
 
 - 點擊帳號列，在該帳號下方展開或收合詳情；一次展開一個帳號，不跳回頂端、不切換登入。額度、重設次數、Credits、快取及錯誤狀態合併於同一卡片。
-- 分析顯示所選 7／30 天已回傳日期的 Token 合計及覆蓋天數。缺失或無效日期不補零；今日可能尚未完整。
-- 分析自動依官方價格快照顯示 API 等價價值；預設 GPT-5.6 Sol，可下拉切換模型，單價與核驗日期自動帶入。
-- 預設情景假設為輸入 80%、其中快取 50%，可於進階選項調整。介面僅有總 Token，無真實分類明細。採用 [官方標準價格](https://developers.openai.com/api/docs/pricing) 短上下文快照，非帳單或節省金額，不含附加費用。
-- 假設依真實帳號儲存在 `~/.codex-switch/valuation.json`（或 `CODEX_SWITCH_HOME`），重新啟動後保留；分析資料仍為依帳號與日期隔離的記憶體快取。
 - macOS 統一使用 `dist/Codex Account Switch.app`。打包腳本遞增 `BUILD_NUMBER`，同步顯示及套件版本；直接編譯前也應遞增該檔案。
+- 預設依帳號實際出現的模型計價。官方介面提供模型的一般輸入、快取輸入及輸出 Token 時直接分項計算；否則依當天模型輪次分攤總 Token，明確標為估算。輪次比例不等於 Token 比例，誤差可能較大。
+- 逐模型列出 Token 分類、金額與來源，另列未計價 Token。未知模型及無法分攤的部分不套用其他模型價格；原下拉選單保留在「單一模型對照」。
+- 使用 2026-09-16 核驗的[官方標準短上下文價格](https://developers.openai.com/api/docs/pricing)。預設輸入 80%、快取占輸入 50%，僅適用於估算部分。不是帳單，不含長上下文、快速模式、快取寫入及工具附加費。
+- 帳號詳情中的「重置歷史記錄」讀取官方過去 30 天獲得／使用記錄，自動遍歷分頁、去重並以本地時間倒序顯示。失敗保留完整快取；私有 `cache/reset-history.json` 依真實帳號隔離，重新啟動後仍可讀取。僅讀歷史，不消耗次數。
+- 本地模型日誌缺乏可靠帳號歸屬，不跨帳號混入估值。個人帳號可能無法取得工作區 Token 明細，介面保留限制與涵蓋天數。
 
 
 ## 主要功能
@@ -138,7 +139,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
 ```
 
-目前基準為 50 項測試，涵蓋身分解析、匯入、權限、可復原刪除、交易式切換、詳情預覽、Claude SQLite、額度視窗、重設次數與活動解析。
+目前基準為 57 項測試，涵蓋身分解析、匯入、權限、可復原刪除、交易式切換、詳情預覽、Claude SQLite、額度視窗、重設次數與活動解析。
 
 ## 安全與發布邊界
 

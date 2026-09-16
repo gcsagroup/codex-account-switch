@@ -8,19 +8,20 @@ Codex Account Switch 是一个本地原生桌面工具，用于保存、预览�
 
 ## 项目状态
 
-- 版本：[`v1.1.0` 预发布版](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.1.0)，2026-09-15。
+- 版本：[v1.2.0 测试预发布版](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.2.0)，Ver 1.2 (14)，2026-09-16。
 - macOS：已完成本机 arm64 App 构建和真实窗口验收；已用 Global Cybersecurity Alliance Limited 的 Apple Distribution 证书签名；未经过 Developer ID 签名及 Apple 公证，Gatekeeper 可能拒绝打开；本版为测试预发布。
 - Windows：本次不提供下载，尚未完成真机端到端验收；CI 构建不等同于实际使用验证。
 - Linux：当前不属于支持或发布验收范围。
 
-### 账号卡片与 Token 估值（Ver 1.1）
+### 自动模型计价与重置历史（Ver 1.2）
 
 - 点击账号行，在该账号下方展开或收起详情；只展开一个账号，不跳回顶部，也不切换登录。额度、重置次数、Credits、缓存及错误状态合并在同一卡片。
-- 分析顶部显示所选 7／30 天内已返回日期的 Token 合计，标出覆盖天数。缺失或无效日期不补零；今日可能尚未完整。
-- 分析自动按官方价格快照显示美元 API 等价价值；默认参考 GPT-5.6 Sol，可下拉切换模型，单价与核验日期自动带入，无需填写。
-- 默认比例为情景假设（输入 80%，其中缓存 50%），可在「高级：估算比例」调整。当前接口只有总 Token，不能推断真实类型分布。使用 [官方标准价格](https://developers.openai.com/api/docs/pricing) 的短上下文快照，不代表账单或节省金额，附加费用未计入。
-- 假设按真实账号保存在 `~/.codex-switch/valuation.json`（或 `CODEX_SWITCH_HOME`），重启后保留；分析数据仍为内存缓存。失败时只保留同一账号、同一范围的成功数据。
 - macOS 统一在 `dist/Codex Account Switch.app` 运行与验收。打包脚本递增 `BUILD_NUMBER`，版本同时显示于窗口与应用包；直接编译前也应递增该文件。
+- 默认自动按账号实际出现的模型计价。官方接口提供模型的普通输入、缓存输入和输出 Token 时，直接分项计算；否则将当天总 Token 按当天模型轮次分摊，明确标为估算。轮次占比不等于 Token 占比，误差可能较大。
+- 逐模型展示分类 Token、等价金额和数据来源，列出未计价 Token。未知模型、缺少活动明细或无法分摊的部分不套用其他模型价格。原模型下拉保留在「单一模型对照」中。
+- 采用 2026-09-16 核验的[官方标准短上下文价格](https://developers.openai.com/api/docs/pricing)。默认分摊假设仍为输入 80%、缓存占输入 50%，只对估算部分生效；不代表账单，不含长上下文、快速模式、缓存写入与工具附加费用。
+- 在账号展开详情中点击「重置历史记录」，读取官方过去 30 天的获得／使用记录，自动遍历分页、去重、按时间倒序显示本地时区。刷新失败保留完整缓存；历史保存在私有的 `cache/reset-history.json`，按真实账号隔离。此入口只读历史，不消耗重置次数。
+- 本地模型日志缺少可靠账号归属，不跨账号混入估值。个人账号的工作区 Token 明细接口可能不可用；界面保留该限制与覆盖天数。
 
 
 ## 主要功能
@@ -138,7 +139,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
 ```
 
-当前基线为 50 项测试，覆盖身份解析、导入、权限、可恢复删除、事务切换、详情预览、Claude SQLite、额度窗口、重置次数和活动解析。
+当前基线为 57 项测试，覆盖身份解析、导入、权限、可恢复删除、事务切换、详情预览、Claude SQLite、额度窗口、重置次数和活动解析。
 
 ## 安全与发布边界
 

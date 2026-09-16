@@ -28,7 +28,9 @@ Slint 窗口 / 系统托盘
 - `src/switcher.rs`：保存/接管/切换、token 写回、快照和回滚。
 - `src/login.rs`：启动/取消 `codex login`、检测 live 文件变化和登录超时。
 - `src/analytics.rs`：四类只读分析接口与 Token 活动接口、日期筛选和统计汇总。
-- `src/valuation.rs`：Token 覆盖日期、情景估值验证与按真实账号保存的假设；不从轮次推断 Token 类型。
+- `src/valuation.rs`：官方价格快照、Token 日期覆盖及按账号保存的估算比例。
+- `src/model_valuation.rs`：优先使用官方模型 Token 分类；降级时按当天轮次分摊并明确标为估算。排除未知价格，不合并无账号标识的本地日志。
+- `src/reset_history.rs`：只读历史分页、游标保护、去重与私有账号缓存；全部分页成功后才替换缓存。
 - `src/analysis_ui.rs`：账号／日期隔离缓存、异步结果校验和分析页面模型。
 - `src/usage.rs`：额度/活动请求、窗口归类、重置时间、缓存和格式化。
 - `src/claude.rs`：Claude Cookies Profile、SQLite 备份/验证、切换、重启、回收和恢复。

@@ -2,9 +2,19 @@
 
 [English](CHANGELOG.md) | [简体中文](CHANGELOG.zh-CN.md) | [繁體中文](CHANGELOG.zh-TW.md)
 
-This changelog records user-facing changes. The first GitHub prerelease is v1.1.0; older development history remains under 0.1.0.
+This log records source changes and local verification; a Git tag does not imply a published GitHub Release.
 
-## v1.1.0 - 2026-09-15 (prerelease)
+## 1.2.0 - 2026-09-16 (testing prerelease)
+
+- Automatic mode prices the models actually reported for the account. When the official API supplies uncached input, cached input and output tokens by model, these are priced separately. Otherwise, each day’s total is apportioned by model turn counts and explicitly labeled as an estimate. Turn shares can differ substantially from token shares.
+- Each model shows token categories, equivalent value and source. Unknown models and unallocated tokens remain unpriced. The former dropdown is available under Single-model comparison.
+- Uses the [official standard short-context price snapshot](https://developers.openai.com/api/docs/pricing) verified on 2026-09-16. The default 80% input / 50% cached-input assumptions apply only to estimated portions. Values are not bills and exclude long context, fast mode, cache writes and tool surcharges.
+- Expand an account and open Reset history to read official received/used events for the past 30 days. All pages are read, deduplicated and sorted newest first in local time. Failed refreshes preserve the complete cache. The private `cache/reset-history.json` persists across restarts and separates real account IDs. This is read-only and consumes no reset credits.
+- Local session logs lack reliable account attribution and are not pooled into valuations. Personal accounts may not expose workspace token details; the UI states this limitation and coverage.
+
+- macOS arm64 build 14, signed by Global Cybersecurity Alliance Limited; ZIP, package checksums and source fingerprints are published after macOS/Windows CI and signed-package validation. 57 local tests pass. Not notarized; no Windows binaries.
+
+## v1.1.0 - 2026-09-15 (tagged local prerelease; no GitHub Release)
 
 - Inline account details consolidate limits, timestamps, cache and error status.
 - Automatic token API-equivalent estimates from an official price snapshot, model selection, optional advanced ratios, date coverage and daily trends.

@@ -29,3 +29,37 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --locked
       - run: cargo build --locked --release
+
+  release:
+    # 本次发布只消费经过本机原生验收的公司签名包；二进制保存在独立发布分支。
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v1.2.0'
+    needs: [macos, windows]
+    runs-on: macos-14
+    permissions:
+      contents: write
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 80ef86bf90307d704d6dde042fb79a9ce7187a09
+          path: release-payload
+          persist-credentials: false
+      - name: 核对源码、校验和、版本和公司签名
+        run: bash scripts/verify-release-macos.sh release-payload
+      - name: 发布 v1.2.0 测试预发布版
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create v1.2.0 \
+            release-payload/Codex-Account-Switch-v1.2.0-macos-arm64.zip \
+            release-payload/SHA256SUMS.txt \
+            release-payload/SOURCE_SHA256SUMS.txt \
+            --verify-tag --prerelease \
+            --title 'v1.2.0 · 自动模型计价与重置历史' \
+            --notes-file docs/releases/v1.2.0.md

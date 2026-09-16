@@ -4,11 +4,13 @@
 
 This guide describes the build scripts and release gates that exist in the current source tree. A successful local or CI build is not, by itself, a signed and supported public release.
 
-## v1.1.0 prerelease (2026-09-15)
+## v1.2.0 testing prerelease (2026-09-16)
 
-macOS 13+ Apple silicon (arm64), build 11. Signed with Apple Distribution: Global Cybersecurity Alliance Limited; not Developer ID signed or notarized. Gatekeeper may reject it. No Windows or native Intel Mac binaries are included.
+macOS 13+ Apple silicon (arm64), build 14. Signed with Apple Distribution: Global Cybersecurity Alliance Limited. Not Developer ID signed or notarized; Gatekeeper may reject it. No Windows or native Intel Mac binaries are included.
 
-[GitHub download](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.1.0). The ZIP contains the App, LICENSE and third-party notices. Verify with `shasum -a 256 -c SHA256SUMS.txt`. Official prices are a snapshot verified on 2026-09-13, not automatically refreshed. Values are scenario estimates, not bills.
+[Download v1.2.0](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.2.0). Assets: signed App ZIP, `SHA256SUMS.txt` and `SOURCE_SHA256SUMS.txt`. The App includes its license and third-party notices. Prices use the official snapshot verified on 2026-09-16. Model turn-based estimates are not billing data.
+
+The SSH identity GCSA-ToolsTeam pushes the source and tag. The already signed package is held in the dedicated `codex/release-assets-v1.2.0` branch. The tag-triggered CI release job pins its immutable commit, waits for both platform checks, validates source fingerprints, package checksum, version, arm64 architecture and company signature, then publishes the same package using the repository workflow token. No signing private key is uploaded. Run `bash scripts/verify-release-macos.sh dist/releases/v1.2.0` for the same local package checks.
 
 ## Toolchain
 
@@ -30,7 +32,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-The current source baseline contains 50 tests. If that number changes, update the status statements in the README and changelog.
+The current source baseline contains 57 tests. If that number changes, update the status statements in the README and changelog.
 
 ## macOS
 
@@ -119,7 +121,7 @@ Static verification does not replace real Windows testing. Before public release
 2. Replace `Unreleased` in all three changelogs with the release date.
 3. Re-run the quality checks and platform packaging checks.
 4. Create the release commit and tag.
-5. Rebuild from that tag, then sign, notarize where applicable, and generate checksums.
+5. Build and sign from the tag, or reuse the validated signed package whose source fingerprints match the tag; complete applicable notarization and checksum checks.
 6. Publish matching binaries, license files, third-party notices, and release notes.
 7. State the platform, architecture, signing status, and known limitations in the GitHub Release.
 

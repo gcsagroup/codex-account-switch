@@ -46,7 +46,7 @@ impl Assumptions {
 }
 
 // 来源：https://developers.openai.com/api/docs/pricing
-// 2026-09-13 核验，Standard / Short context；不是实时同步价格。
+// 2026-09-16 核验，Standard / Short context；不是实时同步价格。
 // 不含缓存写入、长上下文、Fast mode 和地域附加费用。
 pub const OFFICIAL_PRICES: &[(&str, f64, f64, f64)] = &[
     ("gpt-5.6-sol", 4.0, 0.4, 20.0),
@@ -54,6 +54,8 @@ pub const OFFICIAL_PRICES: &[(&str, f64, f64, f64)] = &[
     ("gpt-5.6-terra", 2.0, 0.2, 12.0),
     ("gpt-5.6-luna", 0.2, 0.02, 1.2),
     ("gpt-5.3-codex", 1.75, 0.175, 14.0),
+    // https://developers.openai.com/api/docs/models/gpt-5.5
+    ("gpt-5.5", 5.0, 0.5, 30.0),
 ];
 
 pub fn official_assumption(index: usize) -> Option<Assumptions> {
@@ -65,7 +67,7 @@ pub fn official_assumption(index: usize) -> Option<Assumptions> {
         input_price,
         cached_input_price,
         output_price,
-        price_date: NaiveDate::from_ymd_opt(2026, 9, 13).unwrap(),
+        price_date: NaiveDate::from_ymd_opt(2026, 9, 16).unwrap(),
     })
 }
 

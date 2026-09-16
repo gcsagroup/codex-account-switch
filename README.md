@@ -8,19 +8,20 @@ Built with **Rust 1.97.1**, **Slint 1.17**, and bundled SQLite. The UI does not 
 
 ## Project status
 
-- Version: [`v1.1.0` prerelease](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.1.0), 2026-09-15.
+- Version: [v1.2.0 testing prerelease](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.2.0), Ver 1.2 (14), 2026-09-16.
 - macOS: local arm64 App build and real-window validation completed; signed locally with Apple Distribution: Global Cybersecurity Alliance Limited; not Developer ID signed or notarized. This is a testing prerelease; Gatekeeper may reject it.
 - Windows: no binaries are included in this release; native end-to-end acceptance remains pending. CI build results do not replace real-device testing.
 - Linux: not currently supported or release-tested.
 
-### Inline account details and token valuation (Ver 1.1)
+### Automatic model valuation and reset history (Ver 1.2)
 
 - Click an account row to expand or collapse details in place. Only one account is expanded; this neither scrolls to the top nor switches the active login. Limits, reset credits, balance, cache timestamps and errors stay inside that account card.
-- Analytics totals the returned daily token buckets within 7/30 days and shows coverage. Missing/invalid dates remain unknown; today may be incomplete.
-- Analytics automatically estimates API equivalent value using an official price snapshot. GPT-5.6 Sol is the default reference; choose another model from the dropdown. Prices and verification date require no manual entry.
-- Default scenario: 80% input, of which 50% is cached; adjust optionally under Advanced ratios. The account API provides total tokens, not actual token-type splits. Uses [official Standard short-context prices](https://developers.openai.com/api/docs/pricing); excludes surcharges and is not a bill or savings calculation.
-- Assumptions persist per real account in `~/.codex-switch/valuation.json` (or `CODEX_SWITCH_HOME`). Analytics data remains an in-memory cache isolated by account and date range.
 - Use `dist/Codex Account Switch.app` for macOS builds and acceptance. Packaging increments `BUILD_NUMBER`, shared by the visible and bundle versions; increment it before direct compilation too.
+- Automatic mode prices the models actually reported for the account. When the official API supplies uncached input, cached input and output tokens by model, these are priced separately. Otherwise, each day’s total is apportioned by model turn counts and explicitly labeled as an estimate. Turn shares can differ substantially from token shares.
+- Each model shows token categories, equivalent value and source. Unknown models and unallocated tokens remain unpriced. The former dropdown is available under Single-model comparison.
+- Uses the [official standard short-context price snapshot](https://developers.openai.com/api/docs/pricing) verified on 2026-09-16. The default 80% input / 50% cached-input assumptions apply only to estimated portions. Values are not bills and exclude long context, fast mode, cache writes and tool surcharges.
+- Expand an account and open Reset history to read official received/used events for the past 30 days. All pages are read, deduplicated and sorted newest first in local time. Failed refreshes preserve the complete cache. The private `cache/reset-history.json` persists across restarts and separates real account IDs. This is read-only and consumes no reset credits.
+- Local session logs lack reliable account attribution and are not pooled into valuations. Personal accounts may not expose workspace token details; the UI states this limitation and coverage.
 
 
 ## Features
@@ -139,7 +140,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
 ```
 
-The current baseline is 50 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
+The current baseline is 57 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
 
 ## Security and release boundary
 

@@ -33,6 +33,7 @@ pub struct Snapshot {
     pub plugins: Panel<ToolResponse>,
     pub skills: Panel<ToolResponse>,
     pub tokens: Panel<crate::usage::TokenUsageProfile>,
+    pub detailed_tokens: Panel<crate::model_valuation::DetailedUsage>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -138,7 +139,8 @@ pub fn fetch(
             previous.activity.error = message.clone();
             previous.plugins.error = message.clone();
             previous.skills.error = message.clone();
-            previous.tokens.error = message;
+            previous.tokens.error = message.clone();
+            previous.detailed_tokens.error = message;
             return previous;
         }
     };
@@ -152,6 +154,21 @@ pub fn fetch(
     ];
     // 分别读取，某个面板失败不影响其余面板；只在后台线程等待。
     std::thread::scope(|scope| {
+        let detailed = scope.spawn(|| {
+            let mut query = base.to_vec();
+            query.extend([
+                ("breakdown_by", "model"),
+                ("modes", "codex"),
+                ("modes", "work"),
+            ]);
+            get(
+                &client,
+                token,
+                account,
+                "usage/daily-workspace-user-token-usage-breakdown",
+                &query,
+            )
+        });
         let tokens = scope.spawn(|| crate::usage::fetch_token_usage_profile("", token, account));
         let quota = scope.spawn(|| {
             get(
@@ -195,6 +212,11 @@ pub fn fetch(
                 &query,
             )
         });
+        previous.detailed_tokens.update(
+            detailed
+                .join()
+                .unwrap_or_else(|_| Err(AppError::msg("Token 明细请求中断"))),
+        );
         previous.tokens.update(
             tokens
                 .join()
@@ -224,7 +246,7 @@ pub fn fetch(
     previous
 }
 
-fn get<T: DeserializeOwned>(
+pub(crate) fn get<T: DeserializeOwned>(
     client: &reqwest::blocking::Client,
     token: &str,
     account: &str,
@@ -239,6 +261,9 @@ fn get<T: DeserializeOwned>(
         .send()?;
     let status = response.status();
     let body = response.text()?;
+    if status.as_u16() == 400 && body.contains("No active workspace") {
+        return Err(AppError::msg("此个人账号不提供按模型 Token 分类明细"));
+    }
     if !status.is_success() {
         return Err(AppError::msg(crate::usage::friendly_http_error(
             status.as_u16(),

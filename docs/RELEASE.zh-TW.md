@@ -4,11 +4,13 @@
 
 本文說明目前原始碼中實際存在的建置腳本和發布門檻。本機或 CI 建置成功，不等於已經形成可正式對外發布的簽章產物。
 
-## v1.1.0 預發布（2026-09-15）
+## v1.2.0 測試預發布（2026-09-16）
 
-提供 macOS 13+ Apple 晶片（arm64）ZIP，組建號 11。採用 Global Cybersecurity Alliance Limited Apple Distribution 簽章，未經 Developer ID 及公證，Gatekeeper 可能拒絕開啟。不包含 Windows 或 Intel Mac 原生套件。
+macOS 13+、Apple 晶片（arm64），構建號 14。套件使用 Apple Distribution: Global Cybersecurity Alliance Limited 簽名；未使用 Developer ID、尚未公證，Gatekeeper 可能拒絕開啟。本版不附 Windows 或 Intel Mac 原生二進位檔。
 
-[GitHub 下載](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.1.0)。ZIP 內含 App、LICENSE 及第三方聲明，可用 `shasum -a 256 -c SHA256SUMS.txt` 驗證。官方價格快照核驗於 2026-09-13，不自動更新；估值為情景換算，非帳單。
+[下載 v1.2.0](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.2.0)。附件包含簽名 App ZIP、`SHA256SUMS.txt` 與 `SOURCE_SHA256SUMS.txt`，App 內含授權與第三方聲明。價格使用 2026-09-16 核驗的官方快照；依輪次分攤的估值並非帳單。
+
+原始碼與標籤由 SSH 身分 GCSA-ToolsTeam 推送。已簽名原包保存在獨立的 `codex/release-assets-v1.2.0` 發布分支；標籤觸發的 CI 發布工作固定該分支的提交 SHA，等待兩個平台檢查通過，再核驗原始碼指紋、套件校驗和、版本、arm64 架構及公司簽名，透過儲存庫工作流程權杖發布相同原包。不會上傳簽名私鑰。可用 `bash scripts/verify-release-macos.sh dist/releases/v1.2.0` 在本地執行相同套件核驗。
 
 ## 工具鏈
 
@@ -30,7 +32,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-目前原始碼基線包含 50 項測試。測試數量變更時，應同步更新 README 和 CHANGELOG 中的狀態說明。
+目前原始碼基線包含 57 項測試。測試數量變更時，應同步更新 README 和 CHANGELOG 中的狀態說明。
 
 ## macOS
 
@@ -119,7 +121,7 @@ shasum -a 256 -c codex-account-switch-windows-x86.exe.sha256
 2. 將三種語言 CHANGELOG 中的 `Unreleased` 替換為發布日期。
 3. 重新執行品質檢查和平台打包檢查。
 4. 建立發布提交和標籤。
-5. 從該標籤重新建置，接著完成簽章、公證（如適用）並產生校驗值。
+5. 從標籤建置並簽章，或重用已驗收且原始碼指紋與標籤一致的簽名原包；完成適用公證與核驗。
 6. 發布完全對應的二進位檔、授權條款、第三方聲明和發布說明。
 7. 在 GitHub Release 中寫明平台、架構、簽章狀態和已知限制。
 
@@ -127,4 +129,4 @@ shasum -a 256 -c codex-account-switch-windows-x86.exe.sha256
 
 - macOS App 尚未通過 Developer ID 簽章和 Apple 公證。
 - Windows 執行檔尚未完成程式碼簽章和 x64/x86 實機冒煙測試。
-- `v1.1.0` 為 GitHub 測試預發布，尚非通過上述門檻的穩定版。
+- `v1.2.0` 為 GitHub 測試預發布，尚非通過上述門檻的穩定版。

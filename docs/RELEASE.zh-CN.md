@@ -4,11 +4,13 @@
 
 本文说明当前源码中实际存在的构建脚本和发布门槛。本地或 CI 构建成功，不等于已经形成可正式对外发布的签名产物。
 
-## v1.1.0 预发布（2026-09-15）
+## v1.2.0 测试预发布（2026-09-16）
 
-本版提供 macOS 13+ Apple 芯片（arm64）ZIP，构建号 11。App 使用 Global Cybersecurity Alliance Limited 的 Apple Distribution 证书签名，未使用 Developer ID、未公证，Gatekeeper 可能拒绝打开。本版不包含 Windows 下载或 Intel Mac 原生包。
+macOS 13+、Apple 芯片（arm64），构建号 14。包使用 Apple Distribution: Global Cybersecurity Alliance Limited 签名；未使用 Developer ID、未公证，Gatekeeper 可能拒绝打开。本版不附 Windows 或 Intel Mac 原生二进制。
 
-下载与说明：[GitHub v1.1.0](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.1.0)。ZIP 内含 App、MIT LICENSE 和第三方声明；下载后可用 `shasum -a 256 -c SHA256SUMS.txt` 验证。价格使用 2026-09-13 核验的官方快照，不自动联网更新；估值是情景换算，不是账单。
+[下载 v1.2.0](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.2.0)。附件包含签名 App ZIP、`SHA256SUMS.txt` 和 `SOURCE_SHA256SUMS.txt`，App 内含许可证与第三方声明。价格使用 2026-09-16 核验的官方快照；按轮次分摊的估值不是账单。
+
+源码与标签由 SSH 身份 GCSA-ToolsTeam 推送。已签名原包放在独立的 `codex/release-assets-v1.2.0` 发布分支；标签触发的 CI 发布任务固定该分支的提交 SHA，等待两个平台检查通过，再验证源码指纹、安装包校验和、版本、arm64 架构和公司签名，使用仓库工作流令牌发布同一原包。签名私钥不上传。可用 `bash scripts/verify-release-macos.sh dist/releases/v1.2.0` 在本地执行相同包校验。
 
 ## 工具链
 
@@ -30,7 +32,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-当前源码基线包含 50 项测试。测试数量变化时，应同步更新 README 和 CHANGELOG 中的状态说明。
+当前源码基线包含 57 项测试。测试数量变化时，应同步更新 README 和 CHANGELOG 中的状态说明。
 
 ## macOS
 
@@ -119,7 +121,7 @@ shasum -a 256 -c codex-account-switch-windows-x86.exe.sha256
 2. 将三种语言 CHANGELOG 中的 `Unreleased` 替换为发布日期。
 3. 重新运行质量检查和平台打包检查。
 4. 创建发布提交和标签。
-5. 从该标签重新构建，随后完成签名、公证（如适用）并生成校验值。
+5. 从标签构建并签名，或复用已验收且源码指纹与标签一致的签名原包；完成适用的公证与校验。
 6. 发布完全对应的二进制、许可证、第三方声明和发布说明。
 7. 在 GitHub Release 中写明平台、架构、签名状态和已知限制。
 
@@ -127,4 +129,4 @@ shasum -a 256 -c codex-account-switch-windows-x86.exe.sha256
 
 - macOS App 尚未通过 Developer ID 签名和 Apple 公证。
 - Windows 可执行文件尚未完成代码签名和 x64/x86 真机冒烟测试。
-- `v1.1.0` 为 GitHub 测试预发布，尚不是通过上述门槛的稳定版。
+- `v1.2.0` 为 GitHub 测试预发布，尚不是通过上述门槛的稳定版。

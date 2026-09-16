@@ -173,7 +173,7 @@ pub fn render_locked(window: &MainWindow, state: &AppShared) {
     window.set_analysis_status(if busy { t(lang, "new.loading") } else { "" }.into());
     let dates = analytics::dates(key.2, days);
     window.set_analysis_date_range(format!("{} — {} · UTC", dates[0], key.2).into());
-    render_valuation(window, &snapshot.tokens, &key.0, &dates, lang, busy);
+    render_valuation(window, snapshot, &key.0, &dates, lang, busy);
     window.set_analysis_usage_message(panel_message(&snapshot.usage, lang, busy).into());
     window.set_analysis_activity_message(panel_message(&snapshot.activity, lang, busy).into());
     window.set_analysis_hover("".into());
@@ -421,6 +421,7 @@ pub fn localize(window: &MainWindow, lang: Language) {
     macro_rules! label { ($($setter:ident => $key:literal),* $(,)?) => { $(window.$setter(t(lang, $key).into());)* }; }
     label! {
         set_tr_nav_accounts => "new.nav_accounts", set_tr_nav_analysis => "new.nav_analysis",
+        set_tr_val_auto => "val.auto", set_tr_val_auto_value => "val.auto_value", set_tr_val_manual => "val.manual",
         set_tr_network => "new.network", set_tr_network_hint => "new.network_hint",
         set_tr_add_account => "new.add_account", set_tr_cached => "new.cached", set_tr_more => "new.more",
         set_tr_loading => "new.loading", set_tr_days => "new.days", set_tr_weekly_used => "new.weekly_used", set_tr_plan_usage => "new.plan_usage",
@@ -559,6 +560,8 @@ fn valuation_account(window: &MainWindow, state: &AppShared) -> Option<String> {
 }
 
 fn clear_valuation(w: &MainWindow, message: &str) {
+    w.set_val_model_rows(model(vec![]));
+    w.set_val_auto_status("".into());
     w.set_val_total("—".into());
     w.set_val_cost("—".into());
     w.set_val_message(message.into());
@@ -574,12 +577,15 @@ fn clear_valuation(w: &MainWindow, message: &str) {
 
 fn render_valuation(
     w: &MainWindow,
-    panel: &Panel<crate::usage::TokenUsageProfile>,
+    snapshot: &Snapshot,
     account: &str,
     dates: &[NaiveDate],
     lang: Language,
     busy: bool,
 ) {
+    let panel = &snapshot.tokens;
+    w.set_val_model_rows(model(vec![]));
+    w.set_val_auto_status("".into());
     w.set_val_available(true);
     w.set_val_total("—".into());
     w.set_val_cost("—".into());
@@ -639,10 +645,99 @@ fn render_valuation(
         }
         .into(),
     );
-    let Some(profile) = &panel.data else {
-        return;
+    let empty_profile = crate::usage::TokenUsageProfile::default();
+    let mut series =
+        crate::valuation::token_series(panel.data.as_ref().unwrap_or(&empty_profile), dates);
+    if w.get_val_automatic() {
+        crate::model_valuation::merge_reported_totals(
+            &mut series,
+            dates,
+            snapshot.detailed_tokens.data.as_ref(),
+        );
+    }
+    let automatic = if w.get_val_automatic() {
+        assumption.map(|a| {
+            crate::model_valuation::calculate(
+                dates,
+                &series,
+                snapshot.detailed_tokens.data.as_ref(),
+                snapshot.activity.data.as_ref(),
+                a,
+            )
+        })
+    } else {
+        None
     };
-    let series = crate::valuation::token_series(profile, dates);
+    if let Some(result) = &automatic {
+        w.set_val_basis(
+            assumption
+                .map(|a| {
+                    format!(
+                        "{}: {}% · {}: {}% · {}: {}",
+                        t(lang, "val.input_ratio"),
+                        a.input_percent,
+                        t(lang, "val.cache_ratio"),
+                        a.cached_input_percent,
+                        t(lang, "val.price_date"),
+                        a.price_date
+                    )
+                })
+                .unwrap_or_default()
+                .into(),
+        );
+        let status = t(lang, "val.auto_summary")
+            .replace("{exact}", &result.exact_days.to_string())
+            .replace("{estimated}", &result.estimated_days.to_string())
+            .replace("{priced}", &number(result.priced_tokens))
+            .replace("{unpriced}", &number(result.unpriced_tokens));
+        let freshness = panel_message(&snapshot.detailed_tokens, lang, busy);
+        w.set_val_auto_status(
+            format!(
+                "{status}\n{}\n{}: {freshness}",
+                t(lang, "val.auto_note"),
+                t(lang, "val.exact_source")
+            )
+            .into(),
+        );
+        w.set_val_model_rows(model(
+            result
+                .rows
+                .iter()
+                .map(|row| crate::ValuationRow {
+                    model: row.model.clone().into(),
+                    cost: row
+                        .usd
+                        .map(|v| format!("≈ {}", crate::valuation::money(v)))
+                        .unwrap_or_else(|| t(lang, "val.unpriced").into())
+                        .into(),
+                    detail: format!(
+                        "{} · {} Token · {}: {} / {} / {}",
+                        t(
+                            lang,
+                            if row.estimated {
+                                "val.estimated"
+                            } else {
+                                "val.measured"
+                            }
+                        ),
+                        number(row.tokens),
+                        t(lang, "val.token_types"),
+                        number(row.input),
+                        number(row.cached),
+                        number(row.output)
+                    )
+                    .into(),
+                })
+                .collect(),
+        ));
+        w.set_val_cost(
+            result
+                .total
+                .map(|v| format!("≈ {}", crate::valuation::money(v)))
+                .unwrap_or_else(|| "—".into())
+                .into(),
+        );
+    }
     w.set_val_coverage(
         t(lang, "val.coverage")
             .replace("{n}", &series.covered.to_string())
@@ -651,7 +746,10 @@ fn render_valuation(
     );
     if let Some(total) = series.total {
         w.set_val_total(number(total as f64).into());
-        if let Some(cost) = assumption.and_then(|a| a.usd(total)) {
+        if let Some(cost) = assumption
+            .filter(|_| !w.get_val_automatic())
+            .and_then(|a| a.usd(total))
+        {
             w.set_val_cost(crate::valuation::money(cost).into());
         }
     }
@@ -659,7 +757,11 @@ fn render_valuation(
     let values: Vec<_> = series
         .daily
         .iter()
-        .map(|tokens| {
+        .enumerate()
+        .map(|(i, tokens)| {
+            if cost_mode && w.get_val_automatic() {
+                return automatic.as_ref().and_then(|a| a.daily[i]);
+            }
             tokens.and_then(|n| {
                 if cost_mode {
                     assumption.and_then(|a| a.usd(n))
