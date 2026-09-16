@@ -1,0 +1,1 @@
+984d714772b35d0712378dd85c251fdc60d253c23f652a29221fcdf80055733c  Codex-Account-Switch-v1.2.0-macos-arm64.zip
