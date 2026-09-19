@@ -4,7 +4,22 @@
 
 本文说明当前源码中实际存在的构建脚本和发布门槛。本地或 CI 构建成功，不等于已经形成可正式对外发布的签名产物。
 
-## v1.3.0 测试预发布（2026-09-16）
+## 自动发布（1.3.1 起）
+
+日常只需提交并推送到 `main`。工作流运行测试，生成 `v版本-ci.运行ID.重试次数` 标签与独立预发布；不再手工修改 workflow 的标签、安装包 SHA 或发布分支。其他分支／PR 只检查。支持在 Actions 中手动运行 `main`。一次推送多个提交时发布该次推送的最终提交；后续成功推送各自保留独立版本。
+
+构建号由准备任务统一生成（1000 + workflow 运行序号 × 100 + 重试次数），只在 runner 写入 `BUILD_NUMBER`。不会自动提交文件，避免循环触发。完整重跑有新标签；单独重跑失败任务沿用准备任务的输出。
+
+- Windows：x64 与 x86 分别使用 MSVC、静态 CRT，运行测试、Release 构建、PE 架构检查和 10 秒隔离启动检查。发布两个 ZIP，含程序、许可证、第三方声明、版本／提交信息。启动检查不使用真实账号，不代表切换和托盘完整验收。
+- macOS：自动构建 arm64；默认仅上传公司签名的新包。管理员在仓库 Actions Secrets 设置 `MACOS_SIGNING_P12_B64`（P12 的 base64）、`MACOS_SIGNING_PASSWORD`、`MACOS_SIGNING_IDENTITY`（Global Cybersecurity Alliance Limited 身份）。证书只导入临时 keychain，任务结束删除；不会自动导出开发机私钥。尚不执行公证。
+- 签名配置缺失：发布说明显示 macOS 等待公司签名，仍发布 Windows。管理员显式设置 Actions Variable `MACOS_ALLOW_UNSIGNED=true` 可改为附无公司签名、临时签名的 macOS 测试包。签名配置存在但失败时整个发布失败，不静默降级。
+- 汇总任务核对各包来源提交、版本、构建号、SHA256、ZIP 内容，并生成 `BUILD_INFO.json` 与 `SHA256SUMS.txt`。先创建草稿，全部附件上传后公开；失败时不公开不完整新版本。
+
+自动版是预发布，入口为 [Releases 列表](https://github.com/gcsagroup/codex-account-switch/releases)，不是只返回稳定版的 `/releases/latest`。历史 v1.3.0 公司签名包不被覆盖。Windows 尚无代码签名；macOS 无公司签名或未公证状态必须以每次发布说明为准。
+
+本地验证发布脚本：`python3 -m unittest discover -s scripts/tests -v`；workflow 可用 `actionlint` 检查。实际发布验收必须确认 Actions 成功、下载两个 Windows ZIP 并核对 `SHA256SUMS.txt` 与 `BUILD_INFO.json` 中的提交号。
+
+## 历史 v1.3.0 测试预发布（2026-09-16）
 
 macOS 13+、Apple 芯片（arm64），构建号 19。包使用 Apple Distribution: Global Cybersecurity Alliance Limited 签名；未使用 Developer ID、未公证，Gatekeeper 可能拒绝打开。本版不附 Windows 或 Intel Mac 原生二进制。
 
@@ -34,7 +49,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-当前源码基线包含 57 项测试。测试数量变化时，应同步更新 README 和 CHANGELOG 中的状态说明。
+当前应用基线包含 64 项 Rust 测试，另有发布脚本测试。测试数量变化时，应同步更新 README 和 CHANGELOG 中的状态说明。
 
 ## macOS
 
@@ -117,7 +132,7 @@ shasum -a 256 -c codex-account-switch-windows-x86.exe.sha256
 
 静态验证不能代替 Windows 真机测试。正式发布前，必须在两个支持的架构上验证启动、Codex 导入与切换、Claude Desktop 切换、重启动作、托盘行为和明确退出。
 
-## 发布流程
+## 手动稳定版发布流程（与自动预发布分开）
 
 1. 更新 `Cargo.toml` 版本并刷新 `Cargo.lock`。
 2. 将三种语言 CHANGELOG 中的 `Unreleased` 替换为发布日期。

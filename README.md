@@ -8,9 +8,9 @@ Built with **Rust 1.97.1**, **Slint 1.17**, and bundled SQLite. The UI does not 
 
 ## Project status
 
-- Version: [v1.3.0 testing prerelease](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.3.0), Ver 1.3 (19), 2026-09-16.
-- macOS: local arm64 App build and real-window validation completed; signed locally with Apple Distribution: Global Cybersecurity Alliance Limited; not Developer ID signed or notarized. This is a testing prerelease; Gatekeeper may reject it.
-- Windows: no binaries are included in this release; native end-to-end acceptance remains pending. CI build results do not replace real-device testing.
+- Automatic updates: every `main` push publishes an independent testing prerelease on [Releases](https://github.com/gcsagroup/codex-account-switch/releases) after checks pass. No manual tag is needed. Base version: 1.3.1; tags use `vVERSION-ci.RUN_ID.ATTEMPT`, with increasing application build numbers. Other branches and PRs only run checks.
+- Windows: x64/x86 ZIPs include the executable, licenses and build metadata. Each architecture runs tests, builds and an isolated startup check. Packages are unsigned; real-account switching and tray interactions still need manual acceptance.
+- macOS: CI builds arm64; new packages require company signing by default. Missing configuration is disclosed without blocking Windows releases. Administrators may explicitly set `MACOS_ALLOW_UNSIGNED=true` for packages without company signing. The [historical v1.3.0 company-signed package](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.3.0) remains available and is not notarized.
 - Linux: not currently supported or release-tested.
 
 ### Account reset times and suggested order (Ver 1.3 (19))
@@ -137,7 +137,7 @@ The default application data root remains `~/.codex-switch`, or `CODEX_SWITCH_HO
 Claude Desktop live Cookies paths:
 
 - macOS: `~/Library/Application Support/Claude/Cookies`
-- Windows: no binaries are included in this release; native end-to-end acceptance remains pending. CI build results do not replace real-device testing.
+- Windows: `%APPDATA%\Claude\Cookies`
 
 ## Quality checks
 
@@ -154,7 +154,7 @@ The current baseline is 64 tests covering identity parsing, imports, permissions
 - Credentials and snapshots are local files. Unix data directories target `0700`; credentials, locks, and temporary files are created with `0600`.
 - The application sends the current OAuth token and account ID only to the relevant ChatGPT endpoints for usage queries.
 - There is no project-operated cloud backend, telemetry, or credential synchronization.
-- The GitHub testing prerelease includes a macOS arm64 ZIP and SHA-256 checksums. It is not notarized; no Windows binaries are included.
+- Automatic prereleases include Windows x64/x86 ZIPs, `SHA256SUMS.txt` and `BUILD_INFO.json`. Each release states macOS package availability and signing status; missing signing configuration does not replace the historical company-signed package.
 - ChatGPT `wham` endpoints are not public stable APIs and may change.
 
 ## Documentation

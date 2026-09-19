@@ -4,7 +4,20 @@
 
 本文說明目前原始碼中實際存在的建置腳本和發布門檻。本機或 CI 建置成功，不等於已經形成可正式對外發布的簽章產物。
 
-## v1.3.0 測試預發布（2026-09-16）
+## 自動發布（1.3.1 起）
+
+日常只需推送 `main`。測試通過後自動產生 `v版本-ci.執行ID.重試次數` 標籤及獨立預發布，不必修改 workflow 的版本或套件 SHA。其他分支／PR 只檢查；可手動執行 `main`。一次推送多個提交時發布最後的提交。
+
+準備任務統一產生建置號（1000 + workflow 執行序號 × 100 + 重試次數），只在 runner 寫入 `BUILD_NUMBER`，不回寫原始碼。完整重跑產生新標籤；單獨重跑失敗任務沿用原輸出。
+
+- Windows x64／x86 使用 MSVC 及靜態 CRT，執行測試、建置、PE 架構檢查及 10 秒空資料目錄啟動檢查。兩份 ZIP 包含程式、授權和來源資訊；未簽名，啟動檢查不等同完整互動驗收。
+- macOS 自動建置 arm64；公司簽名需管理員設定 Actions Secrets：`MACOS_SIGNING_P12_B64`、`MACOS_SIGNING_PASSWORD`、`MACOS_SIGNING_IDENTITY`，身份必須屬於 Global Cybersecurity Alliance Limited。只使用臨時 keychain，任務結束清除，不自動匯出本機私鑰；尚未公證。
+- 缺少公司簽名設定時只暫停 macOS 附件，Windows 照常發布。管理員明確設定 Actions Variable `MACOS_ALLOW_UNSIGNED=true` 可發布臨時簽名、無公司簽名測試包。已有設定但簽名失敗時不降級發布。
+- 發布前核驗來源提交、版本、建置號、SHA256 及 ZIP 內容；產生 `BUILD_INFO.json` 和 `SHA256SUMS.txt`。先上傳草稿全部附件再公開，失敗不公開不完整版本。
+
+下載入口為 [Releases 列表](https://github.com/gcsagroup/codex-account-switch/releases)，不是只列穩定版的 `/releases/latest`。歷史公司簽名包不覆蓋。執行 `python3 -m unittest discover -s scripts/tests -v` 驗證發布腳本；實際验收须下載兩份 Windows ZIP 核對校驗和及來源提交。
+
+## 歷史 v1.3.0 測試預發布（2026-09-16）
 
 macOS 13+、Apple 晶片（arm64），構建號 19。套件使用 Apple Distribution: Global Cybersecurity Alliance Limited 簽名；未使用 Developer ID、尚未公證，Gatekeeper 可能拒絕開啟。本版不附 Windows 或 Intel Mac 原生二進位檔。
 
@@ -34,7 +47,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-目前原始碼基線包含 57 項測試。測試數量變更時，應同步更新 README 和 CHANGELOG 中的狀態說明。
+應用程式基線包含 64 項 Rust 測試，另有 9 項發布腳本測試；數量變更時同步更新 README 和 CHANGELOG。
 
 ## macOS
 
@@ -117,7 +130,7 @@ shasum -a 256 -c codex-account-switch-windows-x86.exe.sha256
 
 靜態驗證不能取代 Windows 實機測試。正式發布前，必須在兩個支援的架構上驗證啟動、Codex 匯入與切換、Claude Desktop 切換、重新啟動動作、系統匣行為和明確結束。
 
-## 發布流程
+## 手動穩定版發布流程（與自動預發布分開）
 
 1. 更新 `Cargo.toml` 版本並重新產生 `Cargo.lock`。
 2. 將三種語言 CHANGELOG 中的 `Unreleased` 替換為發布日期。

@@ -8,9 +8,9 @@ Codex Account Switch 是本機原生桌面工具，用於儲存、預覽、切�
 
 ## 專案狀態
 
-- 版本：[v1.3.0 測試預發布版](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.3.0)，Ver 1.3 (19)，2026-09-16。
-- macOS：已完成本機 arm64 App 建置及真實視窗驗收；已使用 Global Cybersecurity Alliance Limited 的 Apple Distribution 憑證簽署；未經 Developer ID 簽章及 Apple 公證；Gatekeeper 可能拒絕開啟，本版為測試預發布。
-- Windows：本次不提供下載，尚未完成實機端到端驗收；CI 建置不等同於實際使用驗證。
+- 自動更新：每次推送 `main`，檢查通過後在 [Releases](https://github.com/gcsagroup/codex-account-switch/releases) 發布獨立測試版，不必手動建立標籤。基線版本 1.3.1；標籤為 `v版本-ci.執行ID.重試次數`，應用程式建置號自動遞增。其他分支和 PR 只檢查，不發布。
+- Windows：提供 x64／x86 ZIP，包含程式、授權與建置資訊；執行對應架構測試、建置與隔離啟動檢查。未簽名，實際帳戶切換與系統匣互動仍需人工驗收。
+- macOS：雲端自動建置 arm64，預設須設定公司簽名才發布新包；未設定時說明原因並繼續發布 Windows。管理員可明確設定 `MACOS_ALLOW_UNSIGNED=true` 發布無公司簽名測試包。[歷史 v1.3.0 公司簽名包](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.3.0) 保留，尚未公證。
 - Linux：目前不在支援或發布驗收範圍內。
 
 ### 重置時間與推薦次序（Ver 1.3 (19)）
@@ -136,7 +136,7 @@ cargo install cargo-xwin --locked
 Claude Desktop 目前 Cookies 路徑：
 
 - macOS：`~/Library/Application Support/Claude/Cookies`
-- Windows：本次不提供下載，尚未完成實機端到端驗收；CI 建置不等同於實際使用驗證。
+- Windows：`%APPDATA%\Claude\Cookies`
 
 ## 品質檢查
 
@@ -153,7 +153,7 @@ cargo test --locked --all-targets
 - 憑據與快照只儲存於本機。Unix 資料目錄目標權限為 `0700`，憑據、鎖與暫存檔建立時使用 `0600`。
 - 額度查詢只會向相關 ChatGPT 端點傳送目前 OAuth token 與 account ID。
 - 專案沒有自有雲端、遙測或憑據同步服務。
-- GitHub 測試預發布提供 macOS arm64 ZIP 及 SHA-256 校驗檔，未公證；本次不提供 Windows 下載。
+- 自動預發布提供 Windows x64／x86 ZIP、`SHA256SUMS.txt` 與 `BUILD_INFO.json`。macOS 新包與簽名狀態以當次發布說明為準；缺少簽名設定時不取代歷史公司簽名包。
 - ChatGPT `wham` 端點不是公開穩定 API，可能發生變更。
 
 ## 文件

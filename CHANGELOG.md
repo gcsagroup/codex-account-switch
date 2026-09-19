@@ -4,6 +4,13 @@
 
 This log records source changes and local verification; a Git tag does not imply a published GitHub Release.
 
+## 1.3.1 - 2026-09-20 (automatic testing prereleases)
+
+- Every `main` push tests, packages and publishes an independent prerelease, without hardcoded tags or a local package commit. Run IDs and attempts distinguish tags; shared build numbers do not write back to Git and cannot trigger a release loop.
+- Windows x64/x86 run native CI tests, builds, PE architecture verification and isolated startup checks. ZIPs include licenses, build provenance and SHA256 checksums. Unsigned; startup checks are not full interactive acceptance.
+- macOS builds in CI and supports company certificates from GitHub Secrets. By default, missing signing configuration only withholds the macOS attachment; Windows still publishes. Packages without company signing require explicit administrator opt-in. Historical signed releases remain separate.
+- Validate commit, version, build number and ZIP hashes before publishing. Upload all draft attachments before making a release public. Add release-script regression tests and trilingual documentation.
+
 ## 1.3.0 - 2026-09-16 (testing prerelease)
 
 - Expanded accounts show Token totals and automatic per-model API-equivalent estimates for the last 7 UTC dates, including today. Dates, coverage, exact/estimated days and unpriced tokens remain visible; this is not the hourly quota-reset cycle. Loading shares the analysis cache, runs in the background, preserves successful data on failure and stays account-scoped.

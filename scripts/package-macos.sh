@@ -3,7 +3,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 VERSION="$(awk -F ' *= *' '/^version = / { gsub(/\"/, "", $2); print $2; exit }' "$ROOT/Cargo.toml")"
-BUILD_NUMBER="$(( $(cat "$ROOT/BUILD_NUMBER") + 1 ))"
+if [[ -n "${CI_BUILD_NUMBER:-}" ]]; then
+  [[ "$CI_BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo 'CI_BUILD_NUMBER 必须为正整数' >&2; exit 1; }
+  BUILD_NUMBER="$CI_BUILD_NUMBER"
+else
+  BUILD_NUMBER="$(( $(cat "$ROOT/BUILD_NUMBER") + 1 ))"
+fi
 printf '%s\n' "$BUILD_NUMBER" > "$ROOT/BUILD_NUMBER"
 RUSTC_BIN="$(rustup which --toolchain 1.97.1 rustc)"
 (cd "$ROOT" && CARGO_TARGET_DIR="$TARGET_DIR" RUSTC="$RUSTC_BIN" rustup run 1.97.1 cargo build --locked --release)
