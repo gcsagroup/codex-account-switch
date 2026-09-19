@@ -149,6 +149,16 @@ fn run_app() -> Result<(), Box<dyn std::error::Error>> {
     install_panic_hook();
     append_log("starting")?;
 
+    // Windows 基础显示驱动可能没有 glCreateShader；轻量账户界面默认用软件渲染。
+    // 显式设置 SLINT_BACKEND 时保留用户选择。
+    #[cfg(target_os = "windows")]
+    if std::env::var_os("SLINT_BACKEND").is_none() {
+        slint::BackendSelector::new()
+            .backend_name("winit".into())
+            .renderer_name("software".into())
+            .select()?;
+    }
+
     let store = ProfileStore::default_store();
     store.ensure_dirs()?;
     let _instance_lock = acquire_instance_lock()?;

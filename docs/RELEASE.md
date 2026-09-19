@@ -47,7 +47,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-The application baseline contains 64 Rust tests, plus 9 release-script tests. Keep README and changelog counts aligned when tests change.
+The application baseline contains 64 Rust tests, plus 12 release-script tests. Windows uses software rendering by default so basic display drivers without OpenGL shader support can launch the app; explicit `SLINT_BACKEND` settings are respected. Keep README and changelog counts aligned when tests change.
 
 ## macOS
 

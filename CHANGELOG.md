@@ -6,6 +6,7 @@ This log records source changes and local verification; a Git tag does not imply
 
 ## 1.3.1 - 2026-09-20 (automatic testing prereleases)
 
+- Fix Windows startup failure on basic display drivers without `glCreateShader`: use software rendering by default while respecting an explicit `SLINT_BACKEND`. CI startup checks require both a live process and evidence of the UI event loop, preserving failure logs.
 - Every `main` push tests, packages and publishes an independent prerelease, without hardcoded tags or a local package commit. Run IDs and attempts distinguish tags; shared build numbers do not write back to Git and cannot trigger a release loop.
 - Windows x64/x86 run native CI tests, builds, PE architecture verification and isolated startup checks. ZIPs include licenses, build provenance and SHA256 checksums. Unsigned; startup checks are not full interactive acceptance.
 - macOS builds in CI and supports company certificates from GitHub Secrets. By default, missing signing configuration only withholds the macOS attachment; Windows still publishes. Packages without company signing require explicit administrator opt-in. Historical signed releases remain separate.

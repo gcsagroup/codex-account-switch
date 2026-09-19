@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 import zipfile
 
 spec = importlib.util.spec_from_file_location("ci_release", Path(__file__).resolve().parents[1] / "ci-release.py")
@@ -106,6 +107,32 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(len(build["packages"]), 2)
         self.assertEqual(len((self.directory / "SHA256SUMS.txt").read_text().splitlines()), 2)
         self.assertIn("等待公司签名配置", (self.directory / "RELEASE_NOTES.md").read_text())
+
+    def smoke_process(self, message, exit_code):
+        def spawn(_command, **kwargs):
+            folder = Path(kwargs["env"]["CODEX_SWITCH_HOME"])
+            folder.mkdir(parents=True)
+            (folder / "app.log").write_text(message, encoding="utf-8")
+            process = Mock()
+            process.poll.return_value = exit_code
+            process.returncode = exit_code
+            return process
+        return spawn
+
+    def test_startup_failure_preserves_application_error(self):
+        with patch.object(release.subprocess, "Popen", side_effect=self.smoke_process("图形初始化失败", 1)):
+            with self.assertRaisesRegex(RuntimeError, "图形初始化失败"):
+                release.startup_smoke(self.directory / "fixture.exe")
+
+    def test_alive_process_without_ui_is_rejected(self):
+        with patch.object(release.subprocess, "Popen", side_effect=self.smoke_process("starting", None)):
+            with patch.object(release.time, "sleep"), self.assertRaisesRegex(RuntimeError, "事件循环"):
+                release.startup_smoke(self.directory / "fixture.exe")
+
+    def test_startup_requires_ui_log_and_live_process(self):
+        with patch.object(release.subprocess, "Popen", side_effect=self.smoke_process("ui shown; entering event loop", None)):
+            with patch.object(release.time, "sleep"):
+                release.startup_smoke(self.directory / "fixture.exe")
 
 
 if __name__ == "__main__":

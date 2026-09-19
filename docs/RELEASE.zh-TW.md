@@ -47,7 +47,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-應用程式基線包含 64 項 Rust 測試，另有 9 項發布腳本測試；數量變更時同步更新 README 和 CHANGELOG。
+應用程式基線包含 64 項 Rust 測試，另有 12 項發布腳本測試。Windows 預設使用軟體繪製，避免基礎顯示驅動缺少 OpenGL shader 支援而無法啟動；保留明確設定的 `SLINT_BACKEND`。數量變更時同步更新 README 和 CHANGELOG。
 
 ## macOS
 
