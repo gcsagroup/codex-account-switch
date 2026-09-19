@@ -75,8 +75,16 @@ def startup_smoke(binary):
             try:
                 for _ in range(10):
                     if process.poll() is not None:
-                        raise RuntimeError(f"启动检查失败：进程提前退出 {process.returncode}")
+                        log.flush()
+                        details = []
+                        for path in (Path(temp) / "startup.log", Path(temp) / "switch/app.log"):
+                            if path.exists():
+                                details.append(path.read_text(encoding="utf-8", errors="replace")[-12000:])
+                        raise RuntimeError(f"启动检查失败：进程提前退出 {process.returncode}\n" + "\n".join(details))
                     time.sleep(1)
+                app_log = Path(temp) / "switch/app.log"
+                if not app_log.exists() or "ui shown; entering event loop" not in app_log.read_text(encoding="utf-8", errors="replace"):
+                    raise RuntimeError("进程存活，但没有界面进入事件循环的证据")
             finally:
                 if process.poll() is None:
                     process.terminate()

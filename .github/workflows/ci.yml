@@ -73,6 +73,7 @@ jobs:
       CI_BUILD_NUMBER: ${{ needs.prepare.outputs.build }}
       RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
       RUSTFLAGS: -C target-feature=+crt-static
+      PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -84,6 +85,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}-static
+          cache-on-failure: true
       - name: 使用统一构建号
         run: python scripts/ci-release.py build-number
       - run: cargo test --locked --target ${{ matrix.target }}
