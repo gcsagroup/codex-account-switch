@@ -29,6 +29,12 @@ macOS 13+、Apple 晶片（arm64），構建號 19。套件使用 Apple Distribu
 
 ## 工具鏈
 
+### 本機公司簽名包補充發布
+
+雲端憑證尚未設定時，先推送 main 並等待 CI 自動發布成功，再依該 Release 的 BUILD_INFO.json 使用同一版本與建置號在本機打包及公司簽名。私鑰留在本機。將原包及含完整來源指紋的 manifest.json 放入獨立分支 `codex/signed-macos/<發布標籤>` 的 `release-macos/`，經 SSH 推送。
+
+補充發布工作流核對主分支來源、標籤、成功 CI、Windows 下載包、macOS 版本／架構／公司簽名及校驗和，才加入同一 Release 並更新三平台清單。同版本已有不同 macOS 包時拒絕覆蓋。未設定雲端憑證前，後續 macOS 公司簽名包仍需此本機步驟，Windows 持續自動發布。
+
 - 固定 Rust 工具鏈：`1.97.1`（`rust-toolchain.toml`）
 - 最低 Rust 版本：`1.92`（`Cargo.toml`）
 - UI 框架：Slint `1.17`
@@ -47,7 +53,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-應用程式基線包含 64 項 Rust 測試，另有 12 項發布腳本測試。Windows 預設使用軟體繪製，避免基礎顯示驅動缺少 OpenGL shader 支援而無法啟動；保留明確設定的 `SLINT_BACKEND`。數量變更時同步更新 README 和 CHANGELOG。
+應用程式基線包含 72 項 Rust 測試，另有 16 項發布腳本測試。Windows 預設使用軟體繪製，避免基礎顯示驅動缺少 OpenGL shader 支援而無法啟動；保留明確設定的 `SLINT_BACKEND`。數量變更時同步更新 README 和 CHANGELOG。
 
 ## macOS
 

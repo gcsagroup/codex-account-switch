@@ -3,6 +3,7 @@
 mod account_order;
 mod analysis_ui;
 mod analytics;
+mod backup;
 mod claude;
 mod error;
 mod identity;
@@ -15,6 +16,7 @@ mod restart;
 mod switcher;
 mod usage;
 mod valuation;
+mod workspace_ui;
 
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -186,6 +188,7 @@ fn run_app() -> Result<(), Box<dyn std::error::Error>> {
     window
         .set_app_version(concat!("Ver ", env!("APP_VERSION"), " (", env!("APP_BUILD"), ")").into());
     let tray = AppTray::new()?;
+    workspace_ui::connect(&window, &tray, Arc::clone(&shared));
     analysis_ui::connect(&window, Arc::clone(&shared));
     reset_history::connect(&window, Arc::clone(&shared));
 
@@ -1539,10 +1542,29 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
 
     let model = ModelRc::new(VecModel::from(rows.clone()));
     window.set_accounts(model.clone());
+    window.set_analysis_accounts(ModelRc::new(VecModel::from(
+        rows.iter()
+            .map(|row| SharedString::from(format!("{} · {}", row.alias, row.email)))
+            .collect::<Vec<_>>(),
+    )));
+    window.set_analysis_account_index(
+        rows.iter()
+            .position(|row| row.alias == detail_alias)
+            .map(|index| index as i32)
+            .unwrap_or(-1),
+    );
     tray.set_accounts(model);
+    workspace_ui::filter(window);
+    window.set_workspace_text(ModelRc::new(VecModel::from(
+        workspace_ui::labels(lang)
+            .into_iter()
+            .map(SharedString::from)
+            .collect::<Vec<_>>(),
+    )));
 
     // Set localized strings
     window.set_tr_app_title(i18n::t(lang, "app.title").into());
+    window.set_tr_gcsa_products(i18n::t(lang, "new.gcsa_products").into());
     window.set_tr_tray_refresh(i18n::t(lang, "tray.refresh").into());
     window.set_tr_tray_switch(i18n::t(lang, "tray.switch").into());
     window.set_tr_tray_quit(i18n::t(lang, "tray.quit").into());

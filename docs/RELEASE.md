@@ -29,6 +29,12 @@ This release adds next reset times, suggested account order and seven-day Token-
 
 ## Toolchain
 
+### Publishing a locally company-signed macOS package
+
+When cloud signing credentials are unavailable, first push main and wait for its automatic release. Build locally using the exact version and build number from that release's BUILD_INFO.json, then sign with the existing company identity without exporting its private key. Push the original ZIP and manifest.json, including complete tracked source fingerprints, under `release-macos/` on a separate `codex/signed-macos/<release-tag>` branch via SSH.
+
+The dedicated workflow verifies main ancestry, the tag, successful CI, downloaded Windows packages, macOS version/architecture/company signature and checksums before attaching the original package to the same release and regenerating all three platform manifests. It refuses to replace a different macOS package already published under the same version. Until cloud signing is configured, subsequent company-signed macOS packages still require this local step; Windows releases remain automatic.
+
 - Pinned Rust toolchain: `1.97.1` (`rust-toolchain.toml`)
 - Minimum Rust version: `1.92` (`Cargo.toml`)
 - UI framework: Slint `1.17`
@@ -47,7 +53,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-The application baseline contains 64 Rust tests, plus 12 release-script tests. Windows uses software rendering by default so basic display drivers without OpenGL shader support can launch the app; explicit `SLINT_BACKEND` settings are respected. Keep README and changelog counts aligned when tests change.
+The application baseline contains 72 Rust tests, plus 16 release-script tests. Windows uses software rendering by default so basic display drivers without OpenGL shader support can launch the app; explicit `SLINT_BACKEND` settings are respected. Keep README and changelog counts aligned when tests change.
 
 ## macOS
 

@@ -1,0 +1,86 @@
+name: Publish signed macOS
+
+on:
+  push:
+    branches: ['codex/signed-macos/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: signed-macos-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: macos-14
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: payload
+          sparse-checkout: release-macos
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 读取限定格式的来源信息
+        id: meta
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          info = json.loads(Path('payload/release-macos/manifest.json').read_text())
+          patterns = {'commit': r'[0-9a-f]{40}', 'tag': r'v[0-9.]+-ci\.[0-9]+\.[0-9]+', 'build': r'[1-9][0-9]*'}
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for key, pattern in patterns.items():
+                  value = info[key]
+                  if not isinstance(value, str) or not re.fullmatch(pattern, value):
+                      raise ValueError('来源格式错误：' + key)
+                  output.write(f'{key}={value}\n')
+          PY
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.commit }}
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: 核对主分支来源及已成功的自动发布
+        working-directory: source
+        env:
+          SOURCE_SHA: ${{ steps.meta.outputs.commit }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          test "$(git rev-parse "$RELEASE_TAG^{commit}")" = "$SOURCE_SHA"
+          gh run list --commit "$SOURCE_SHA" --workflow ci.yml --json conclusion,status,event > ../runs.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          runs = json.loads(Path('../runs.json').read_text())
+          assert any(r['status'] == 'completed' and r['conclusion'] == 'success' and r['event'] == 'push' for r in runs), '来源 CI 尚未成功'
+          PY
+          gh release download "$RELEASE_TAG" --dir ../release-assets
+      - name: 核验原包并重建三平台清单
+        working-directory: source
+        env:
+          SOURCE_SHA: ${{ steps.meta.outputs.commit }}
+          CI_BUILD_NUMBER: ${{ steps.meta.outputs.build }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          export GITHUB_SHA="$SOURCE_SHA"
+          python scripts/verify-signed-macos.py ../payload/release-macos ../release-assets
+          python scripts/ci-release.py assemble --directory ../release-assets
+      - name: 上传公司签名原包并更新发布说明
+        env:
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          gh release upload "$RELEASE_TAG" release-assets/*-macos-arm64.zip --clobber
+          gh release upload "$RELEASE_TAG" release-assets/SHA256SUMS.txt release-assets/BUILD_INFO.json --clobber
+          gh release edit "$RELEASE_TAG" --notes-file release-assets/RELEASE_NOTES.md

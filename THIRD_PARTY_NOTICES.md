@@ -28,6 +28,7 @@ Codex Account Switch uses the open-source and third-party components listed belo
 | rusqlite | 0.40.2 | Claude Desktop SQLite data access | MIT | https://github.com/rusqlite/rusqlite |
 | libsqlite3-sys | 0.38.2 | Bundled SQLite bindings and source | MIT; SQLite core is Public Domain | https://github.com/rusqlite/rusqlite |
 | serde / serde_json | 1.0.229 / 1.0.151 | Data serialization | MIT OR Apache-2.0 | https://serde.rs / https://github.com/serde-rs/json |
+| tempfile | 3.27.0 | Private temporary backup validation files | MIT OR Apache-2.0 | https://github.com/Stebalien/tempfile |
 | thiserror | 2.0.19 | Error types | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror |
 | windows-sys | 0.61.2 | Windows system APIs | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 

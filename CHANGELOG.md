@@ -4,6 +4,16 @@
 
 This log records source changes and local verification; a Git tag does not imply a published GitHub Release.
 
+## 1.4.0 - 2026-09-21
+
+- Add SSH delivery of locally company-signed macOS packages, verifying the source inputs and matching Windows release before combining all platforms. Signing keys stay local.
+- Add sidebar links to the GCSA product catalog and GitHub organization repositories, opening in the default browser.
+- Select accounts directly in Analytics. Token summaries, activity charts and insights now share the same page, removing the nested activity screen; heatmaps adapt to the width beside the sidebar.
+- Searchable, compact account cards with dedicated Details, Analytics and Switch actions; preserve reset times, recommendations and weekly Token estimates.
+- Full saved-account backup for Codex and Claude Desktop with import preview, identical-data skips and conflict renaming. Existing profiles and active logins remain unchanged.
+- Explicit unencrypted-credential and cross-computer recovery notices; validate format, size and aliases, preserve private permissions and roll back failed writes.
+- 72 application tests and 16 release-script tests, including both-service backup round trips, conflicts, corrupt input, rollback and search.
+
 ## 1.3.1 - 2026-09-20 (automatic testing prereleases)
 
 - Fix Windows startup failure on basic display drivers without `glCreateShader`: use software rendering by default while respecting an explicit `SLINT_BACKEND`. CI startup checks require both a live process and evidence of the UI event loop, preserving failure logs.

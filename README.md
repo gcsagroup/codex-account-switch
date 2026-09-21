@@ -8,10 +8,20 @@ Built with **Rust 1.97.1**, **Slint 1.17**, and bundled SQLite. The UI does not 
 
 ## Project status
 
-- Automatic updates: every `main` push publishes an independent testing prerelease on [Releases](https://github.com/gcsagroup/codex-account-switch/releases) after checks pass. No manual tag is needed. Base version: 1.3.1; tags use `vVERSION-ci.RUN_ID.ATTEMPT`, with increasing application build numbers. Other branches and PRs only run checks.
+- Automatic updates: every `main` push publishes an independent testing prerelease on [Releases](https://github.com/gcsagroup/codex-account-switch/releases) after checks pass. No manual tag is needed. Base version: 1.4.0; tags use `vVERSION-ci.RUN_ID.ATTEMPT`, with increasing application build numbers. Other branches and PRs only run checks.
 - Windows: x64/x86 ZIPs include the executable, licenses and build metadata. Each architecture runs tests, builds and an isolated startup check. Packages are unsigned; real-account switching and tray interactions still need manual acceptance.
 - macOS: CI builds arm64; new packages require company signing by default. Missing configuration is disclosed without blocking Windows releases. Administrators may explicitly set `MACOS_ALLOW_UNSIGNED=true` for packages without company signing. The [historical v1.3.0 company-signed package](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.3.0) remains available and is not notarized.
 - Linux: not currently supported or release-tested.
+
+### Account workspace and full backup (Ver 1.4)
+
+The bottom sidebar links to [GCSA products](https://gcsa.org/products) and [GitHub repositories](https://github.com/orgs/gcsagroup/repositories), opening in your default browser.
+
+- Search by name, email or plan. Compact cards keep usage, resets and recommendations visible, with separate Details, Analytics and Switch actions.
+- Export all saves Codex and Claude Desktop profiles into one `.casbackup` file. Import previews additions, identical-data skips and renamed conflicts before confirmation.
+- Backups contain credentials and are **not encrypted**. Keep them in a trusted local location. Identical data is skipped; conflicts use `-import-2` and similar suffixes. Existing accounts and active logins are unchanged. Export never overwrites existing files.
+- Includes saved `auth.json` and Claude Cookies; excludes unsaved live sessions, analytics caches, system keys and deleted accounts. Claude may need sign-in again on another computer.
+- Limits: 500 accounts, 48 MiB raw data, 64 MiB backup file. All entries are validated before writing; write failures roll back new accounts. Refresh after an abnormal interruption. macOS backups are readable/writable only by the current user.
 
 ### Account reset times and suggested order (Ver 1.3 (19))
 
@@ -51,9 +61,9 @@ Built with **Rust 1.97.1**, **Slint 1.17**, and bundled SQLite. The UI does not 
 
 ### Navigation and analytics
 
-- Accounts holds quota details; Add account expands login/import, and More contains detail, analytics, restart, rename, and delete actions.
+- Accounts holds quota details; Add account expands login/import, and More contains restart, rename, and delete actions. Details and Analytics have dedicated buttons.
 - Analytics shows 7/30-day plan usage by product/model, turns by model/client, and plugin/skill activity for the previewed account. Viewing analytics does not switch the active account.
-- Token activity has a separate entry. Analytics caches are memory-only and isolated by account identity and date range, with independent error states.
+- Choose the viewed account directly at the top of Analytics without changing the active login. Token summaries, daily/weekly/cumulative activity, equivalent value and tool insights share one page. The activity chart covers 52 weeks; the 7/30-day filter applies to usage and valuation. Analytics caches are memory-only and isolated by account identity and date range, with independent error states.
 - Connection explains system proxy support. Failed quota refreshes retain the last success time and show the actual success count.
 - Tool totals aggregate the daily top 8 plugins or top 6 skills returned by the service, rather than a complete audit. Plan usage follows server units and is separate from current weekly quota.
 
@@ -147,7 +157,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
 ```
 
-The current baseline is 64 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
+The current baseline is 72 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
 
 ## Security and release boundary
 

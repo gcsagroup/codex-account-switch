@@ -1,6 +1,6 @@
 [package]
 name = "codex-account-switch"
-version = "1.3.1"
+version = "1.4.0"
 edition = "2021"
 rust-version = "1.92"
 description = "Cross-platform desktop app for switching Codex and Claude Desktop accounts"
@@ -20,15 +20,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 slint = "1.17"
 thiserror = "2"
+tempfile = "3"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
 
 [build-dependencies]
 slint-build = "1.17"
-
-[dev-dependencies]
-tempfile = "3"
 
 [profile.release]
 lto = true

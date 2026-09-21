@@ -233,6 +233,7 @@ component Field inherits Rectangle {
     in-out property <string> text;
     in property <string> placeholder;
     callback accepted();
+    callback edited();
 
     height: 36px;
     border-radius: 6px;
@@ -262,6 +263,7 @@ component Field inherits Rectangle {
         single-line: true;
         vertical-alignment: center;
         accepted => { root.accepted(); }
+        edited => { root.edited(); }
     }
 }
 
@@ -356,6 +358,21 @@ export component MainWindow inherits Window {
     background: Theme.bg;
 
     in-out property <[AccountRow]> accounts: [];
+    in-out property <[AccountRow]> visible-accounts: [];
+    in-out property <string> account-query;
+    // 工作区文案依次为搜索、导入、导出、备份标题、提示、确认、结果等。
+    in-out property <[string]> workspace-text;
+    in-out property <bool> backup-open: false;
+    in-out property <bool> backup-ready: false;
+    in-out property <string> backup-heading;
+    in-out property <string> backup-message;
+    in-out property <string> backup-confirm-label;
+    in-out property <[string]> backup-rows;
+    callback filter-accounts();
+    callback export-all();
+    callback import-all();
+    callback confirm-backup();
+    callback cancel-backup();
     in-out property <string> account-order-summary;
     in-out property <string> account-order-rule;
     in-out property <string> status-text: "Ready";
@@ -400,8 +417,8 @@ export component MainWindow inherits Window {
     in-out property <bool> can-restore: false;
     in-out property <bool> usage-busy: false;
     in-out property <string> app-version;
-    private property <string> expanded-account: current-alias;
-    changed provider-index => { expanded-account = ""; val-editing = false; }
+    private property <string> expanded-account: "";
+    changed provider-index => { expanded-account = ""; account-query = ""; val-editing = false; }
     in-out property <string> usage-notice;
     in-out property <bool> current-stale: false;
     in-out property <string> current-usage-stamp;
@@ -467,12 +484,15 @@ export component MainWindow inherits Window {
     in-out property <string> val-hover;
     in-out property <ValLabels> val-text;
     callback open-pricing();
+    callback open-gcsa-link(bool);
+    in-out property <string> tr-gcsa-products;
     callback begin-valuation();
     callback apply-valuation();
     callback load-analysis(bool);
+    in-out property <[string]> analysis-accounts;
+    in-out property <int> analysis-account-index: -1;
     callback update-analysis();
     private property <bool> show-about: false;
-    private property <bool> show-activity: false;
     private property <int> activity-range: 0;
 
     callback set-language(int);
@@ -632,11 +652,13 @@ export component MainWindow inherits Window {
                     Text { text: "Account Switch"; color: Theme.copper; font-size: 14px; font-weight: 600; }
                     Rectangle { height: 16px; }
                     Text { text: "CODEX"; color: Theme.faint; font-size: 10px; }
-                    GhostButton { label: tr-nav-accounts; solid: provider-index == 0 && page-index == 0; horizontal-stretch: 1; btn-height: 38px; clicked => { page-index = 0; show-activity = false; root.set-provider(0); } }
-                    GhostButton { label: tr-nav-analysis; solid: provider-index == 0 && page-index == 1; horizontal-stretch: 1; btn-height: 38px; clicked => { if provider-index != 0 { root.set-provider(0); } page-index = 1; show-activity = false; root.load-analysis(false); } }
+                    GhostButton { label: tr-nav-accounts; solid: provider-index == 0 && page-index == 0; horizontal-stretch: 1; btn-height: 38px; clicked => { page-index = 0; if provider-index != 0 { root.set-provider(0); } } }
+                    GhostButton { label: tr-nav-analysis; solid: provider-index == 0 && page-index == 1; horizontal-stretch: 1; btn-height: 38px; clicked => { if provider-index != 0 { root.set-provider(0); } page-index = 1; root.load-analysis(false); } }
                     Rectangle { height: 14px; }
-                    GhostButton { label: "Claude Desktop"; solid: provider-index == 1; horizontal-stretch: 1; btn-height: 38px; clicked => { page-index = 0; show-activity = false; root.set-provider(1); } }
+                    GhostButton { label: "Claude Desktop"; solid: provider-index == 1; horizontal-stretch: 1; btn-height: 38px; clicked => { page-index = 0; root.set-provider(1); } }
                     Rectangle { vertical-stretch: 1; }
+                    GhostButton { label: tr-gcsa-products + " ↗"; horizontal-stretch: 1; clicked => { root.open-gcsa-link(false); } }
+                    GhostButton { label: "GitHub ↗"; horizontal-stretch: 1; clicked => { root.open-gcsa-link(true); } }
                     GhostButton { label: tr-network; horizontal-stretch: 1; clicked => { show-network = !show-network; } }
                     GhostButton { label: tr-btn-quit; horizontal-stretch: 1; clicked => { quit(); } }
                 }
@@ -645,7 +667,7 @@ export component MainWindow inherits Window {
             content-scroll := ScrollView {
                 horizontal-stretch: 1;
                 VerticalBox {
-                    padding: 26px; spacing: 20px;
+                    padding: 22px; spacing: 16px;
                     if show-network: Rectangle {
                         height: 126px; border-radius: 10px; background: Theme.elevated;
                         VerticalBox {
@@ -659,12 +681,14 @@ export component MainWindow inherits Window {
                         }
                     }
                     if page-index == 0: VerticalBox {
-                        spacing: 20px;
+                        spacing: 12px;
                         HorizontalBox {
                             VerticalBox { spacing: 4px; horizontal-stretch: 1;
                                 Text { text: provider-index == 0 ? tr-nav-accounts : "Claude Desktop"; font-size: 25px; font-weight: 600; color: Theme.text; }
-                                Text { text: accounts.length + " " + tr-profiles-count; font-size: 12px; color: Theme.muted; }
+                                Text { text: accounts.length + " " + tr-profiles-count + (active-alias == "" ? "" : " · " + tr-label-in-use + "  " + active-alias); font-size: 12px; color: Theme.muted; overflow: elide; }
                             }
+                            GhostButton { label: workspace-text[1]; clicked => { root.import-all(); } }
+                            GhostButton { label: workspace-text[2]; clicked => { root.export-all(); } }
                             GhostButton { label: show-add ? tr-about-close : tr-add-account; emphasis: !show-add; clicked => { show-add = !show-add; } }
                         }
                         if show-add || rename-from != "": Rectangle {
@@ -843,7 +867,8 @@ export component MainWindow inherits Window {
                     }
                 }
                         HorizontalBox {
-                            Text { text: tr-profiles-title; font-size: 16px; font-weight: 600; color: Theme.text; horizontal-stretch: 1; vertical-alignment: center; }
+                            Field { text <=> root.account-query; placeholder: workspace-text[0]; horizontal-stretch: 1; edited => { root.filter-accounts(); } }
+                            if account-query != "": GhostButton { label: workspace-text[13]; clicked => { account-query = ""; root.filter-accounts(); } }
                             GhostButton { label: tr-btn-refresh-list; clicked => { root.refresh(); } }
                             if provider-index == 0: GhostButton { label: usage-busy ? tr-loading : tr-btn-refresh-usage; enabled: !usage-busy; clicked => { root.refresh-usage(); } }
                         }
@@ -852,7 +877,8 @@ export component MainWindow inherits Window {
                             Text { text: account-order-rule; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
                         }
                         if accounts.length == 0: Text { text: tr-profiles-empty + "\n" + tr-profiles-empty-hint; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
-                        for acc in root.accounts: account-row := Rectangle {
+                        if accounts.length > 0 && visible-accounts.length == 0: Text { text: workspace-text[14]; color: Theme.muted; font-size: 13px; }
+                        for acc in root.visible-accounts: account-row := Rectangle {
                             private property <bool> expanded: false;
                             private property <bool> history-open: false;
                             changed details => { if !self.details { self.history-open = false; } }
@@ -860,9 +886,9 @@ export component MainWindow inherits Window {
                             vertical-stretch: 0;
                             background: Theme.panel;
                             border-radius: 10px;
-                            border-width: 1px; border-color: details ? Theme.copper.with-alpha(0.45) : Theme.line;
+                            border-width: 1px; border-color: acc.is_current ? Theme.copper.with-alpha(0.7) : details ? Theme.copper.with-alpha(0.45) : Theme.line;
                             TouchArea {
-                                x: 0px; y: 0px; height: 74px;
+                                x: 0px; y: 0px; height: 64px; width: parent.width - 330px;
                                 mouse-cursor: pointer;
                                 accessible-role: button;
                                 accessible-label: root.tr-detail-title + " · " + acc.alias;
@@ -871,21 +897,29 @@ export component MainWindow inherits Window {
                                     else { root.expanded-account = acc.alias; root.preview-account(acc.alias); }
                                 }
                             }
-                            VerticalBox { padding: 16px; spacing: 12px;
-                                HorizontalBox { spacing: 12px; min-height: 42px;
+                            VerticalBox { padding: 14px; spacing: 8px;
+                                HorizontalBox { spacing: 10px; min-height: 40px;
                                     VerticalBox { spacing: 4px; horizontal-stretch: 1;
                                         Text { text: acc.alias + "  " + acc.plan + (acc.is_current ? " · " + tr-label-in-use : ""); font-size: 14px; font-weight: 600; color: Theme.text; overflow: elide; }
                                         Text { text: acc.email; font-size: 11px; color: Theme.muted; overflow: elide; }
                                     }
-                                    if provider-index == 0 && !account-row.details: Text { text: acc.secondary_available ? tr-weekly-used + " " + Math.round(acc.secondary_pct) + "%" : "—"; font-size: 12px; color: Theme.muted; vertical-alignment: center; }
-                                    Text { text: account-row.details ? "▴" : "▾"; color: Theme.muted; vertical-alignment: center; }
-                                    if !acc.is_current: GhostButton { label: tr-btn-switch; enabled: acc.is_valid; clicked => { root.use-account(acc.alias); } }
-                                    if provider-index == 0: GhostButton { label: tr-nav-analysis; clicked => { root.preview-account(acc.alias); page-index = 1; root.load-analysis(false); } }
+                                    if provider-index == 0: VerticalBox { width: 134px; horizontal-stretch: 0; spacing: 6px; alignment: center;
+                                        Text { text: acc.secondary_available ? tr-weekly-used + " " + Math.round(acc.secondary_pct) + "%" : acc.usage_summary; font-size: 11px; color: acc.usage_attention ? Theme.copper : Theme.muted; overflow: elide; }
+                                        Rectangle { height: 4px; border-radius: 2px; background: Theme.line;
+                                            Rectangle { width: parent.width * Math.min(1, Math.max(0, acc.secondary_pct / 100)); height: parent.height; border-radius: 2px; background: acc.secondary_pct >= 90 ? Theme.copper : Theme.ok; visible: acc.secondary_available; }
+                                        }
+                                    }
+                                    GhostButton { label: tr-detail-title + (account-row.details ? " ▴" : " ▾"); solid: account-row.details; clicked => { if account-row.details { root.expanded-account = ""; } else { root.expanded-account = acc.alias; root.preview-account(acc.alias); } } }
                                     GhostButton { label: tr-more; solid: account-row.expanded; clicked => { account-row.expanded = !account-row.expanded; } }
                                 }
-                                if provider-index == 0: VerticalBox { spacing: 5px;
-                                    Text { text: acc.reset_summary; font-size: 12px; color: Theme.text; wrap: word-wrap; }
-                                    Text { text: acc.recommendation; font-size: 11px; color: Theme.copper; wrap: word-wrap; }
+                                HorizontalBox { spacing: 10px;
+                                    VerticalBox { horizontal-stretch: 1; spacing: 4px;
+                                        if provider-index == 0: Text { text: acc.reset_summary; font-size: 12px; color: Theme.text; wrap: word-wrap; }
+                                        if provider-index == 0: Text { text: acc.recommendation; font-size: 11px; color: Theme.copper; wrap: word-wrap; }
+                                        if provider-index == 1: Text { text: tr-claude-session-hint; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
+                                    }
+                                    if provider-index == 0: GhostButton { label: tr-nav-analysis; clicked => { root.preview-account(acc.alias); page-index = 1; root.load-analysis(false); } }
+                                    GhostButton { label: acc.is_current ? tr-label-in-use : tr-btn-switch; emphasis: !acc.is_current; enabled: acc.is_valid && !acc.is_current; clicked => { root.use-account(acc.alias); } }
                                 }
                                 if account-row.details: VerticalBox {
                                     spacing: 14px;
@@ -945,7 +979,6 @@ export component MainWindow inherits Window {
                                 if provider-index == 0 && !account-row.details: Text { text: (acc.usage_error != "" ? tr-cached + " · " : "") + acc.usage_updated; font-size: 11px; color: Theme.muted; }
                                 if provider-index == 0 && acc.usage_error != "": Text { text: acc.usage_error; font-size: 11px; color: Theme.copper; wrap: word-wrap; }
                                 if account-row.expanded: HorizontalBox { spacing: 8px;
-                                    GhostButton { label: tr-detail-title; clicked => { root.expanded-account = acc.alias; root.preview-account(acc.alias); } }
                                     GhostButton { label: tr-btn-restart; enabled: acc.is_valid; clicked => { root.use-account-restart(acc.alias); } }
                                     GhostButton { label: tr-btn-rename; clicked => { show-add = true; root.begin-rename(acc.alias); } }
                                     GhostButton { label: tr-btn-delete; danger: true; clicked => { root.remove-account(acc.alias); } }
@@ -965,8 +998,166 @@ export component MainWindow inherits Window {
                                 Text { text: current-alias + " · " + current-plan + "  /  " + analysis-date-range; color: Theme.muted; font-size: 12px; overflow: elide; }
                             }
                             ComboBox { width: 90px; horizontal-stretch: 0; model: ["7 " + tr-days, "30 " + tr-days]; current-index <=> root.analysis-range; selected(value) => { root.load-analysis(false); } }
-                            GhostButton { label: analysis-busy ? tr-loading : tr-btn-refresh-usage; enabled: !analysis-busy && current-alias != ""; clicked => { root.load-analysis(true); } }
+                            GhostButton { label: analysis-busy ? tr-loading : tr-btn-refresh-usage; enabled: !analysis-busy && current-alias != ""; clicked => { root.load-analysis(true); root.refresh-usage(); } }
                         }
+                        ComboBox {
+                            horizontal-stretch: 1;
+                            model: root.analysis-accounts;
+                            current-index: root.analysis-account-index;
+                            enabled: root.accounts.length > 0;
+                            selected(value) => {
+                                if self.current-index >= 0 && self.current-index < root.accounts.length {
+                                    root.preview-account(root.accounts[self.current-index].alias);
+                                    root.load-analysis(false);
+                                }
+                            }
+                        }
+                        Text { text: tr-token-title + " · " + current-alias; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                        if current-activity-error != "": Text { text: tr-cached + " · " + current-activity-error; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
+                        if current-token-lifetime == "": Rectangle {
+                            height: 100px;
+                            border-radius: 14px;
+                            background: Theme.panel;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            VerticalBox {
+                                alignment: center;
+                                spacing: 12px;
+                                Text {
+                                    text: tr-activity-no-data;
+                                    font-size: 13px;
+                                    color: Theme.muted;
+                                    horizontal-alignment: center;
+                                }
+                                HorizontalBox {
+                                    alignment: center;
+                                    GhostButton {
+                                        label: tr-btn-refresh-usage;
+                                        emphasis: true;
+                                        clicked => { refresh-usage(); }
+                                    }
+                                }
+                            }
+                        }
+
+                        if current-token-lifetime != "": HorizontalBox {
+                            height: 72px;
+                            spacing: 8px;
+                            ActivityMetric { value: current-token-lifetime; label: tr-token-lifetime; }
+                            ActivityMetric { value: current-token-peak; label: tr-token-peak; }
+                            ActivityMetric { value: current-token-longest; label: tr-token-longest; }
+                            ActivityMetric { value: current-token-streak; label: tr-token-streak; }
+                            ActivityMetric { value: current-token-longest-streak; label: tr-activity-longest-streak; }
+                        }
+
+                        if current-token-lifetime != "": Rectangle {
+                            height: 190px;
+                            border-radius: 14px;
+                            background: Theme.panel;
+                            border-width: 1px;
+                            border-color: Theme.line.with-alpha(0.78);
+                            VerticalBox {
+                                padding: 14px;
+                                spacing: 10px;
+                                HorizontalBox {
+                                    height: 28px;
+                                    Text {
+                                        text: tr-activity-chart-title;
+                                        font-size: 11px;
+                                        font-family: "Menlo";
+                                        font-weight: 700;
+                                        letter-spacing: 1px;
+                                        color: Theme.text;
+                                        horizontal-stretch: 1;
+                                        vertical-alignment: center;
+                                    }
+                                    Text {
+                                        text: tr-activity-chart-hint;
+                                        font-size: 9px;
+                                        font-family: "Menlo";
+                                        color: Theme.faint;
+                                        vertical-alignment: center;
+                                    }
+                                    for tab[idx] in [tr-activity-daily, tr-activity-weekly, tr-activity-cumulative]: Rectangle {
+                                        width: 72px;
+                                        height: 28px;
+                                        border-radius: 7px;
+                                        background: activity-range == idx ? Theme.copper.with-alpha(0.16) : transparent;
+                                        border-width: activity-range == idx ? 1px : 0px;
+                                        border-color: Theme.copper.with-alpha(0.72);
+                                        accessible-role: button;
+                                        accessible-label: tab;
+                                        accessible-action-default => { activity-range = idx; }
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { activity-range = idx; }
+                                        }
+                                        Text {
+                                            text: tab;
+                                            font-size: 10px;
+                                            font-weight: activity-range == idx ? 700 : 400;
+                                            color: activity-range == idx ? Theme.copper : Theme.muted;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+
+                                activity-chart := Rectangle {
+                                    height: 116px;
+                                    background: Theme.bg.with-alpha(0.36);
+                                    border-radius: 10px;
+
+                                    if activity-range == 0: Rectangle {
+                                        x: 8px;
+                                        y: 8px;
+                                        width: parent.width - 16px;
+                                        height: 100px;
+                                        for value[idx] in root.current-token-daily: Rectangle {
+                                            x: Math.floor(idx / 7) * parent.width / 52;
+                                            y: Math.mod(idx, 7) * 14px;
+                                            width: max(2px, parent.width / 52 - 3px);
+                                            height: 10px;
+                                            border-radius: 3px;
+                                            background: value <= 0
+                                                ? Theme.line.with-alpha(0.36)
+                                                : Theme.copper.with-alpha(0.22 + value * 0.78);
+                                        }
+                                    }
+
+                                    if activity-range == 1: Rectangle {
+                                        x: 10px;
+                                        y: 8px;
+                                        width: parent.width - 20px;
+                                        height: 100px;
+                                        for value[idx] in root.current-token-weekly: Rectangle {
+                                            width: max(3px, parent.width / 52 - 4px);
+                                            x: idx * parent.width / 52 + 2px;
+                                            height: max(2px, value * 94px);
+                                            y: parent.height - self.height;
+                                            border-radius: 2px;
+                                            background: value > 0 ? Theme.copper : Theme.line.with-alpha(0.36);
+                                        }
+                                    }
+
+                                    if activity-range == 2: Rectangle {
+                                        x: 10px;
+                                        y: 8px;
+                                        width: parent.width - 20px;
+                                        height: 100px;
+                                        for value[idx] in root.current-token-cumulative: Rectangle {
+                                            width: max(3px, parent.width / 52 - 4px);
+                                            x: idx * parent.width / 52 + 2px;
+                                            height: max(2px, value * 94px);
+                                            y: parent.height - self.height;
+                                            border-radius: 2px;
+                                            background: value > 0 ? Theme.ok : Theme.line.with-alpha(0.36);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         if analysis-status != "": Text { text: analysis-status; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
                         Rectangle {
                             vertical-stretch: 0; background: Theme.panel; border-radius: 12px; border-width: 1px; border-color: Theme.line;
@@ -1094,10 +1285,110 @@ export component MainWindow inherits Window {
                             RankingPanel { title: tr-product-activity; total: analysis-turn-total; subtitle: tr-turns; rows: analysis-activity-rows; message: analysis-activity-message; options: [tr-by-model, tr-by-client]; selection <=> root.analysis-activity-group; selected => { root.update-analysis(); } }
                             RankingPanel { title: tr-tool-activity; total: analysis-tool-total; subtitle: tr-returned-total; rows: analysis-tool-rows; message: analysis-tool-message; options: [tr-plugins, tr-skills]; selection <=> root.analysis-tool-group; selected => { root.update-analysis(); } }
                         }
-                        HorizontalBox { spacing: 12px;
-                            Text { text: tr-analysis-source; color: Theme.muted; font-size: 11px; horizontal-stretch: 1; wrap: word-wrap; }
-                            GhostButton { label: tr-token-title + " →"; clicked => { show-activity = true; activity-range = 0; } }
+                        if current-token-lifetime != "": HorizontalBox {
+                            height: 214px;
+                            spacing: 12px;
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                border-radius: 14px;
+                                background: Theme.panel;
+                                border-width: 1px;
+                                border-color: Theme.line.with-alpha(0.78);
+                                VerticalBox {
+                                    padding: 14px;
+                                    spacing: 8px;
+                                    Text {
+                                        text: tr-activity-insights;
+                                        font-size: 10px;
+                                        font-family: "Menlo";
+                                        font-weight: 700;
+                                        letter-spacing: 1px;
+                                        color: Theme.text;
+                                    }
+                                    GridLayout {
+                                        spacing-horizontal: 10px;
+                                        spacing-vertical: 8px;
+                                        Row {
+                                            Text { text: tr-activity-fast-mode; font-size: 11px; color: Theme.muted; }
+                                            Text { text: current-fast-mode; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
+                                        }
+                                        Row {
+                                            Text { text: tr-activity-reasoning; font-size: 11px; color: Theme.muted; }
+                                            Text { text: current-reasoning; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; overflow: elide; }
+                                        }
+                                        Row {
+                                            Text { text: tr-activity-unique-skills; font-size: 11px; color: Theme.muted; }
+                                            Text { text: current-unique-skills; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
+                                        }
+                                        Row {
+                                            Text { text: tr-activity-total-skills; font-size: 11px; color: Theme.muted; }
+                                            Text { text: current-total-skills; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
+                                        }
+                                        Row {
+                                            Text { text: tr-activity-threads; font-size: 11px; color: Theme.muted; }
+                                            Text { text: current-total-threads; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                horizontal-stretch: 1.35;
+                                border-radius: 14px;
+                                background: Theme.panel;
+                                border-width: 1px;
+                                border-color: Theme.line.with-alpha(0.78);
+                                VerticalBox {
+                                    padding: 14px;
+                                    spacing: 6px;
+                                    Text {
+                                        text: tr-activity-top;
+                                        font-size: 10px;
+                                        font-family: "Menlo";
+                                        font-weight: 700;
+                                        letter-spacing: 1px;
+                                        color: Theme.text;
+                                    }
+                                    for item in root.current-top-invocations: HorizontalBox {
+                                        height: 27px;
+                                        spacing: 8px;
+                                        Rectangle {
+                                            width: 42px;
+                                            height: 20px;
+                                            border-radius: 10px;
+                                            background: Theme.elevated;
+                                            border-width: 1px;
+                                            border-color: Theme.line;
+                                            Text {
+                                                text: item.kind;
+                                                font-size: 8px;
+                                                font-family: "Menlo";
+                                                color: Theme.copper;
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                                overflow: elide;
+                                            }
+                                        }
+                                        Text {
+                                            text: item.name;
+                                            font-size: 11px;
+                                            color: Theme.text;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                        }
+                                        Text {
+                                            text: item.count + " " + tr-activity-runs;
+                                            font-size: 10px;
+                                            font-family: "Menlo";
+                                            color: Theme.muted;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
                         }
+                        Text { text: tr-analysis-source; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
                     }
                 }
             }
@@ -1110,296 +1401,26 @@ export component MainWindow inherits Window {
         }
     }
 
-    if show-activity: Rectangle {
-        z: 50;
-        x: 0px;
-        y: 49px;
-        width: parent.width;
-        height: parent.height - 79px;
-        background: Theme.bg;
-
-        ScrollView {
-            VerticalBox {
-                padding: 18px;
-                spacing: 12px;
-
+    if backup-open: Rectangle {
+        z: 110; background: #00000099;
+        TouchArea {}
+        Rectangle {
+            width: min(640px, parent.width - 48px); height: min(backup-rows.length > 0 ? 530px : 340px, parent.height - 60px);
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            background: Theme.panel; border-radius: 14px; border-width: 1px; border-color: Theme.line;
+            TouchArea {}
+            VerticalBox { padding: 22px; spacing: 14px;
+                Text { text: backup-heading; color: Theme.text; font-size: 20px; font-weight: 600; }
+                Text { text: backup-message; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                ScrollView { vertical-stretch: 1;
+                    VerticalBox { spacing: 7px; padding: 4px; alignment: start;
+                        for row in backup-rows: Text { text: row; color: Theme.text; font-size: 12px; wrap: word-wrap; vertical-stretch: 0; min-height: 24px; }
+                    }
+                }
                 HorizontalBox {
-                    height: 34px;
-                    spacing: 10px;
-                    VerticalBox {
-                        spacing: 1px;
-                        horizontal-stretch: 1;
-                        Text {
-                            text: tr-activity-title;
-                            font-size: 18px;
-                            font-weight: 700;
-                            color: Theme.text;
-                        }
-                        Text {
-                            text: tr-activity-subtitle + " · " + current-alias;
-                            font-size: 9px;
-                            font-family: "Menlo";
-                            color: Theme.faint;
-                        }
-                    }
-                    GhostButton {
-                        label: tr-btn-refresh-usage;
-                        solid: true;
-                        clicked => { refresh-usage(); }
-                    }
-                    GhostButton {
-                        label: tr-activity-back;
-                        clicked => { show-activity = false; }
-                    }
-                }
-
-                if current-activity-error != "": Text { text: tr-cached + " · " + current-activity-error; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
-                if current-token-lifetime == "": Rectangle {
-                    height: 430px;
-                    border-radius: 14px;
-                    background: Theme.panel;
-                    border-width: 1px;
-                    border-color: Theme.line;
-                    VerticalBox {
-                        alignment: center;
-                        spacing: 12px;
-                        Text {
-                            text: tr-activity-no-data;
-                            font-size: 13px;
-                            color: Theme.muted;
-                            horizontal-alignment: center;
-                        }
-                        HorizontalBox {
-                            alignment: center;
-                            GhostButton {
-                                label: tr-btn-refresh-usage;
-                                emphasis: true;
-                                clicked => { refresh-usage(); }
-                            }
-                        }
-                    }
-                }
-
-                if current-token-lifetime != "": HorizontalBox {
-                    height: 72px;
-                    spacing: 8px;
-                    ActivityMetric { value: current-token-lifetime; label: tr-token-lifetime; }
-                    ActivityMetric { value: current-token-peak; label: tr-token-peak; }
-                    ActivityMetric { value: current-token-longest; label: tr-token-longest; }
-                    ActivityMetric { value: current-token-streak; label: tr-token-streak; }
-                    ActivityMetric { value: current-token-longest-streak; label: tr-activity-longest-streak; }
-                }
-
-                if current-token-lifetime != "": Rectangle {
-                    height: 190px;
-                    border-radius: 14px;
-                    background: Theme.panel;
-                    border-width: 1px;
-                    border-color: Theme.line.with-alpha(0.78);
-                    VerticalBox {
-                        padding: 14px;
-                        spacing: 10px;
-                        HorizontalBox {
-                            height: 28px;
-                            Text {
-                                text: tr-activity-chart-title;
-                                font-size: 11px;
-                                font-family: "Menlo";
-                                font-weight: 700;
-                                letter-spacing: 1px;
-                                color: Theme.text;
-                                horizontal-stretch: 1;
-                                vertical-alignment: center;
-                            }
-                            Text {
-                                text: tr-activity-chart-hint;
-                                font-size: 9px;
-                                font-family: "Menlo";
-                                color: Theme.faint;
-                                vertical-alignment: center;
-                            }
-                            for tab[idx] in [tr-activity-daily, tr-activity-weekly, tr-activity-cumulative]: Rectangle {
-                                width: 72px;
-                                height: 28px;
-                                border-radius: 7px;
-                                background: activity-range == idx ? Theme.copper.with-alpha(0.16) : transparent;
-                                border-width: activity-range == idx ? 1px : 0px;
-                                border-color: Theme.copper.with-alpha(0.72);
-                                accessible-role: button;
-                                accessible-label: tab;
-                                accessible-action-default => { activity-range = idx; }
-                                TouchArea {
-                                    mouse-cursor: pointer;
-                                    clicked => { activity-range = idx; }
-                                }
-                                Text {
-                                    text: tab;
-                                    font-size: 10px;
-                                    font-weight: activity-range == idx ? 700 : 400;
-                                    color: activity-range == idx ? Theme.copper : Theme.muted;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
-                                }
-                            }
-                        }
-
-                        activity-chart := Rectangle {
-                            height: 116px;
-                            background: Theme.bg.with-alpha(0.36);
-                            border-radius: 10px;
-
-                            if activity-range == 0: Rectangle {
-                                x: (parent.width - 728px) / 2;
-                                y: 8px;
-                                width: 728px;
-                                height: 100px;
-                                for value[idx] in root.current-token-daily: Rectangle {
-                                    x: Math.floor(idx / 7) * 14px;
-                                    y: Math.mod(idx, 7) * 14px;
-                                    width: 10px;
-                                    height: 10px;
-                                    border-radius: 3px;
-                                    background: value <= 0
-                                        ? Theme.line.with-alpha(0.36)
-                                        : Theme.copper.with-alpha(0.22 + value * 0.78);
-                                }
-                            }
-
-                            if activity-range == 1: Rectangle {
-                                x: 10px;
-                                y: 8px;
-                                width: parent.width - 20px;
-                                height: 100px;
-                                for value[idx] in root.current-token-weekly: Rectangle {
-                                    width: max(3px, parent.width / 52 - 4px);
-                                    x: idx * parent.width / 52 + 2px;
-                                    height: max(2px, value * 94px);
-                                    y: parent.height - self.height;
-                                    border-radius: 2px;
-                                    background: value > 0 ? Theme.copper : Theme.line.with-alpha(0.36);
-                                }
-                            }
-
-                            if activity-range == 2: Rectangle {
-                                x: 10px;
-                                y: 8px;
-                                width: parent.width - 20px;
-                                height: 100px;
-                                for value[idx] in root.current-token-cumulative: Rectangle {
-                                    width: max(3px, parent.width / 52 - 4px);
-                                    x: idx * parent.width / 52 + 2px;
-                                    height: max(2px, value * 94px);
-                                    y: parent.height - self.height;
-                                    border-radius: 2px;
-                                    background: value > 0 ? Theme.ok : Theme.line.with-alpha(0.36);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if current-token-lifetime != "": HorizontalBox {
-                    height: 214px;
-                    spacing: 12px;
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        border-radius: 14px;
-                        background: Theme.panel;
-                        border-width: 1px;
-                        border-color: Theme.line.with-alpha(0.78);
-                        VerticalBox {
-                            padding: 14px;
-                            spacing: 8px;
-                            Text {
-                                text: tr-activity-insights;
-                                font-size: 10px;
-                                font-family: "Menlo";
-                                font-weight: 700;
-                                letter-spacing: 1px;
-                                color: Theme.text;
-                            }
-                            GridLayout {
-                                spacing-horizontal: 10px;
-                                spacing-vertical: 8px;
-                                Row {
-                                    Text { text: tr-activity-fast-mode; font-size: 11px; color: Theme.muted; }
-                                    Text { text: current-fast-mode; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
-                                }
-                                Row {
-                                    Text { text: tr-activity-reasoning; font-size: 11px; color: Theme.muted; }
-                                    Text { text: current-reasoning; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; overflow: elide; }
-                                }
-                                Row {
-                                    Text { text: tr-activity-unique-skills; font-size: 11px; color: Theme.muted; }
-                                    Text { text: current-unique-skills; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
-                                }
-                                Row {
-                                    Text { text: tr-activity-total-skills; font-size: 11px; color: Theme.muted; }
-                                    Text { text: current-total-skills; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
-                                }
-                                Row {
-                                    Text { text: tr-activity-threads; font-size: 11px; color: Theme.muted; }
-                                    Text { text: current-total-threads; font-size: 12px; font-family: "Menlo"; color: Theme.text; horizontal-alignment: right; }
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        horizontal-stretch: 1.35;
-                        border-radius: 14px;
-                        background: Theme.panel;
-                        border-width: 1px;
-                        border-color: Theme.line.with-alpha(0.78);
-                        VerticalBox {
-                            padding: 14px;
-                            spacing: 6px;
-                            Text {
-                                text: tr-activity-top;
-                                font-size: 10px;
-                                font-family: "Menlo";
-                                font-weight: 700;
-                                letter-spacing: 1px;
-                                color: Theme.text;
-                            }
-                            for item in root.current-top-invocations: HorizontalBox {
-                                height: 27px;
-                                spacing: 8px;
-                                Rectangle {
-                                    width: 42px;
-                                    height: 20px;
-                                    border-radius: 10px;
-                                    background: Theme.elevated;
-                                    border-width: 1px;
-                                    border-color: Theme.line;
-                                    Text {
-                                        text: item.kind;
-                                        font-size: 8px;
-                                        font-family: "Menlo";
-                                        color: Theme.copper;
-                                        horizontal-alignment: center;
-                                        vertical-alignment: center;
-                                        overflow: elide;
-                                    }
-                                }
-                                Text {
-                                    text: item.name;
-                                    font-size: 11px;
-                                    color: Theme.text;
-                                    vertical-alignment: center;
-                                    overflow: elide;
-                                    horizontal-stretch: 1;
-                                }
-                                Text {
-                                    text: item.count + " " + tr-activity-runs;
-                                    font-size: 10px;
-                                    font-family: "Menlo";
-                                    color: Theme.muted;
-                                    vertical-alignment: center;
-                                }
-                            }
-                        }
-                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    GhostButton { label: backup-ready ? tr-rename-cancel : tr-about-close; clicked => { root.cancel-backup(); } }
+                    if backup-ready: GhostButton { label: backup-confirm-label; emphasis: true; clicked => { root.confirm-backup(); } }
                 }
             }
         }

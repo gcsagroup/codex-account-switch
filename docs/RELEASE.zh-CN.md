@@ -19,6 +19,14 @@
 
 本地验证发布脚本：`python3 -m unittest discover -s scripts/tests -v`；workflow 可用 `actionlint` 检查。实际发布验收必须确认 Actions 成功、下载两个 Windows ZIP 并核对 `SHA256SUMS.txt` 与 `BUILD_INFO.json` 中的提交号。
 
+## 本机公司签名包补充发布
+
+云端证书尚未配置时，可以用本机已有公司证书签名，不导出私钥。先推送源码到 `main`，等待该提交的自动发布成功；按该 Release 的 `BUILD_INFO.json` 使用同一版本和构建号重新打包、签名。
+
+将原包及 `manifest.json` 放到独立分支 `codex/signed-macos/<发布标签>` 的 `release-macos/` 目录，再通过 SSH 推送。清单包含平台、签名状态、提交、版本、构建号、发布标签、包名、SHA256 和完整 tracked 源码指纹（构建号由 App 内 plist 单独核验）。此分支只触发公司签名包发布工作流，不重复触发主 CI。
+
+工作流验证来源属于 main、标签指向该提交且 CI 已成功；下载已发布的 Windows 包，验证 macOS 原包、完整构建输入、App 版本、arm64 架构及公司签名，再上传到同一个 Release，重建三平台校验清单和发布说明。已有同版本不同内容的 macOS 包会被拒绝覆盖。未配置云端证书前，后续提交的 macOS 公司签名包仍需此本机步骤，Windows 继续自动发布。
+
 ## 历史 v1.3.0 测试预发布（2026-09-16）
 
 macOS 13+、Apple 芯片（arm64），构建号 19。包使用 Apple Distribution: Global Cybersecurity Alliance Limited 签名；未使用 Developer ID、未公证，Gatekeeper 可能拒绝打开。本版不附 Windows 或 Intel Mac 原生二进制。
@@ -49,7 +57,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-当前应用基线包含 64 项 Rust 测试，另有 12 项发布脚本测试。Windows 默认软件渲染，避免基础显示驱动缺少 OpenGL shader 支持而无法启动；保留显式 `SLINT_BACKEND` 设置。测试数量变化时，应同步更新 README 和 CHANGELOG 中的状态说明。
+当前应用基线包含 72 项 Rust 测试，另有 16 项发布脚本测试。Windows 默认软件渲染，避免基础显示驱动缺少 OpenGL shader 支持而无法启动；保留显式 `SLINT_BACKEND` 设置。测试数量变化时，应同步更新 README 和 CHANGELOG 中的状态说明。
 
 ## macOS
 

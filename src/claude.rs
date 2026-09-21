@@ -449,7 +449,7 @@ impl ClaudeSwitcher {
     }
 }
 
-fn validate_cookie_db_path(path: &Path) -> AppResult<()> {
+pub(crate) fn validate_cookie_db_path(path: &Path) -> AppResult<()> {
     let metadata = fs::metadata(path)?;
     if metadata.len() == 0 || metadata.len() > MAX_COOKIE_DB_BYTES {
         return Err(AppError::msg(

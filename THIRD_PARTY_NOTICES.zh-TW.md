@@ -28,6 +28,7 @@ Codex Account Switch 使用以下開放原始碼或第三方元件。版本取�
 | rusqlite | 0.40.2 | Claude Desktop SQLite 資料存取 | MIT | https://github.com/rusqlite/rusqlite |
 | libsqlite3-sys | 0.38.2 | 隨應用程式編譯的 SQLite 繫結與原始碼 | MIT；SQLite 核心為 Public Domain | https://github.com/rusqlite/rusqlite |
 | serde / serde_json | 1.0.229 / 1.0.151 | 資料序列化 | MIT OR Apache-2.0 | https://serde.rs / https://github.com/serde-rs/json |
+| tempfile | 3.27.0 | 私有暫存備份檢查檔案 | MIT OR Apache-2.0 | https://github.com/Stebalien/tempfile |
 | thiserror | 2.0.19 | 錯誤類型 | MIT OR Apache-2.0 | https://github.com/dtolnay/thiserror |
 | windows-sys | 0.61.2 | Windows 系統 API | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 
