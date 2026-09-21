@@ -93,6 +93,50 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "架构"):
             release.check_pe(path, 0x14C)
 
+    def icon_pe(self, magic=0x20B):
+        # 构造最小资源树，同时覆盖 32/64 位 PE 的不同可选头位置。
+        data = bytearray(4096)
+        data[:2] = b"MZ"
+        struct.pack_into("<I", data, 0x3C, 64)
+        data[64:68] = b"PE\0\0"
+        struct.pack_into("<HH", data, 68, 0x8664 if magic == 0x20B else 0x14C, 1)
+        struct.pack_into("<H", data, 84, 240)
+        struct.pack_into("<H", data, 88, magic)
+        struct.pack_into("<II", data, 88 + (112 if magic == 0x20B else 96) + 16, 0x1000, 2048)
+        struct.pack_into("<IIII", data, 88 + 240 + 8, 2048, 0x1000, 2048, 512)
+        def directory(offset, entries):
+            struct.pack_into("<HH", data, 512 + offset + 12, 0, len(entries))
+            for index, item in enumerate(entries):
+                struct.pack_into("<II", data, 512 + offset + 16 + index * 8, *item)
+        directory(0, [(3, 0x80000040), (14, 0x80000080)])
+        directory(64, [(n + 1, 0x80000100 + n * 32) for n in range(4)])
+        directory(128, [(1, 0x80000180)])
+        group = bytearray(struct.pack("<HHH", 0, 1, 4))
+        for n, size in enumerate((16, 32, 48, 256)):
+            directory(256 + n * 32, [(1033, 512 + n * 16)])
+            struct.pack_into("<IIII", data, 1024 + n * 16, 0x1300 + n * 4, 4, 0, 0)
+            data[1280 + n * 4:1284 + n * 4] = b"ICON"
+            group.extend(struct.pack("<BBBBHHIH", size % 256, size % 256, 0, 0, 1, 32, 4, n + 1))
+        directory(384, [(1033, 576)])
+        struct.pack_into("<IIII", data, 1088, 0x1400, len(group), 0, 0)
+        data[1536:1536 + len(group)] = group
+        return data
+
+    def test_windows_icon_resources_for_both_architectures(self):
+        for magic in (0x10B, 0x20B):
+            path = self.directory / "fixture.exe"
+            path.write_bytes(self.icon_pe(magic))
+            self.assertEqual(release.check_windows_icon(path), [(16, 16), (32, 32), (48, 48), (256, 256)])
+
+    def test_missing_icon_or_dangling_group_reference_is_rejected(self):
+        path = self.directory / "fixture.exe"
+        for offset, fmt, value in ((216, "<I", 0), (1554, "<H", 999)):
+            data = self.icon_pe()
+            struct.pack_into(fmt, data, offset, value)
+            path.write_bytes(data)
+            with self.assertRaisesRegex(ValueError, "图标"):
+                release.check_windows_icon(path)
+
     def test_assemble_command_produces_download_checksums_and_notes(self):
         self.expected["version"] = release.version()
         self.expected["tag"] = f"v{release.version()}-ci.123.1"

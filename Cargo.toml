@@ -1,6 +1,6 @@
 [package]
 name = "codex-account-switch"
-version = "1.4.0"
+version = "1.4.1"
 edition = "2021"
 rust-version = "1.92"
 description = "Cross-platform desktop app for switching Codex and Claude Desktop accounts"
@@ -27,6 +27,7 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage
 
 [build-dependencies]
 slint-build = "1.17"
+embed-resource = "3.0.11"
 
 [profile.release]
 lto = true

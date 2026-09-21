@@ -65,6 +65,64 @@ def check_pe(binary, machine):
         raise ValueError("Windows 架构与包名不匹配")
 
 
+def check_windows_icon(binary):
+    """验证 PE 中的图标组及其引用的图像，防止发布没有应用图标的 EXE。"""
+    data = binary.read_bytes()
+    def unpack(fmt, offset):
+        return struct.unpack_from(fmt, data, offset)
+    pe = unpack("<I", 0x3C)[0]
+    sections = unpack("<H", pe + 6)[0]
+    optional_size = unpack("<H", pe + 20)[0]
+    optional = pe + 24
+    magic = unpack("<H", optional)[0]
+    if magic not in (0x10B, 0x20B):
+        raise ValueError("Windows 可选头无效")
+    directory = optional + (96 if magic == 0x10B else 112)
+    resource_rva, resource_size = unpack("<II", directory + 16)
+    if not resource_rva or not resource_size:
+        raise ValueError("Windows 应用图标资源缺失")
+    def file_offset(rva, size=1):
+        for index in range(sections):
+            section = optional + optional_size + index * 40
+            _, address, raw_size, raw = unpack("<IIII", section + 8)
+            if address <= rva and rva + size <= address + raw_size:
+                offset = raw + rva - address
+                if offset + size <= len(data):
+                    return offset
+        raise ValueError("Windows 图标资源地址无效")
+    base = file_offset(resource_rva, resource_size)
+    def entries(relative):
+        named, ids = unpack("<HH", base + relative + 12)
+        return [unpack("<II", base + relative + 16 + i * 8) for i in range(named + ids)]
+    def images(kind):
+        result = {}
+        for type_id, names in entries(0):
+            if type_id != kind or not names & 0x80000000:
+                continue
+            for name, languages in entries(names & 0x7fffffff):
+                if not languages & 0x80000000:
+                    raise ValueError("Windows 图标资源目录无效")
+                for _, leaf in entries(languages & 0x7fffffff):
+                    rva, size = unpack("<II", base + leaf)
+                    start = file_offset(rva, size)
+                    result[name] = data[start:start + size]
+        return result
+    icons, groups = images(3), images(14)
+    sizes = set()
+    for group in groups.values():
+        reserved, kind, count = struct.unpack_from("<HHH", group)
+        if reserved != 0 or kind != 1:
+            raise ValueError("Windows 图标组无效")
+        for index in range(count):
+            width, height, _, _, _, _, size, image_id = struct.unpack_from("<BBBBHHIH", group, 6 + index * 14)
+            if image_id not in icons or len(icons[image_id]) != size or size == 0:
+                raise ValueError("Windows 图标图像缺失")
+            sizes.add((width or 256, height or 256))
+    if not {(16, 16), (32, 32), (48, 48), (256, 256)} <= sizes:
+        raise ValueError("Windows 应用图标缺失必要尺寸")
+    return sorted(sizes)
+
+
 def startup_smoke(binary):
     # 云端测试使用空目录；不导入真实账号、不执行切换。
     with tempfile.TemporaryDirectory(prefix="codex-switch-smoke-") as temp:
@@ -95,6 +153,7 @@ def windows_package(target):
     arch, machine = ("x64", 0x8664) if target.startswith("x86_64-") else ("x86", 0x14C)
     binary = ROOT / "target" / target / "release/codex-account-switch.exe"
     check_pe(binary, machine)
+    check_windows_icon(binary)
     startup_smoke(binary)
     info = build_info(f"windows-{arch}", "unsigned")
     output = ROOT / "dist/ci"
@@ -106,7 +165,7 @@ def windows_package(target):
             archive.write(ROOT / name, name)
         archive.writestr("BUILD_INFO.json", json.dumps(info, indent=2))
     write_manifest(package, info)
-    print(f"Windows {arch} PE、隔离启动和打包检查通过：{package.name}")
+    print(f"Windows {arch} PE、应用图标、隔离启动和打包检查通过：{package.name}")
 
 
 def validate_packages(directory, expected):
@@ -171,7 +230,7 @@ def assemble(directory):
 
 每次推送到 main，测试成功后自动发布此提交的独立测试版。无需手工创建标签。
 
-- Windows x64 / x86：ZIP 内含可执行文件、许可、第三方声明和构建信息；未做代码签名。已通过对应架构测试、Release 构建、PE 校验及空数据目录启动检查；账号切换和托盘交互仍需真机验收。
+- Windows x64 / x86：ZIP 内含可执行文件、许可、第三方声明和构建信息；未做代码签名。已通过对应架构测试、Release 构建、PE 架构及图标校验、空数据目录启动检查；账号切换和托盘交互仍需真机验收。
 - {mac}
 - 附 SHA256SUMS.txt 和 BUILD_INFO.json；缺少平台产物、版本不一致或校验失败时不公开发布。
 - 最新功能与修改见本次源码内的 CHANGELOG.zh-CN.md、CHANGELOG.zh-TW.md 和 CHANGELOG.md。

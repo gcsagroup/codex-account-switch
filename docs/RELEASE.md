@@ -10,7 +10,7 @@ Push to `main`; successful checks create an independent `vVERSION-ci.RUN_ID.ATTE
 
 One preparation job assigns the build number (1000 + workflow run number × 100 + attempt), written to `BUILD_NUMBER` only on runners. No Git write-back loop. Full reruns get new tags; rerunning failed jobs reuses the preparation outputs.
 
-- Windows x64/x86 use MSVC with static CRT, run tests, release builds, PE validation and a 10-second isolated startup check. ZIPs include executable, licenses and provenance. Unsigned; startup checks do not replace interactive account and tray acceptance.
+- Windows x64/x86 use MSVC with static CRT, run tests, release builds, PE architecture and embedded multi-resolution icon validation, and a 10-second isolated startup check. ZIPs include executable, licenses and provenance. Unsigned; startup checks do not replace interactive account and tray acceptance.
 - macOS builds arm64. Company signing requires administrator-configured Actions Secrets: `MACOS_SIGNING_P12_B64`, `MACOS_SIGNING_PASSWORD`, `MACOS_SIGNING_IDENTITY` for Global Cybersecurity Alliance Limited. The temporary keychain is removed after signing. Local private keys are never exported automatically. Notarization is not configured.
 - Missing signing configuration withholds only the macOS attachment and discloses that limitation; Windows still publishes. Administrators may explicitly set Actions Variable `MACOS_ALLOW_UNSIGNED=true` for ad-hoc signed macOS packages without company signing. A configured but failing signer fails the release rather than silently downgrading.
 - Assembly verifies source commit, version, build, hashes and ZIP contents. `BUILD_INFO.json` and `SHA256SUMS.txt` accompany packages. All draft attachments upload before publication; failures do not expose incomplete new releases.
@@ -53,7 +53,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-The application baseline contains 72 Rust tests, plus 16 release-script tests. Windows uses software rendering by default so basic display drivers without OpenGL shader support can launch the app; explicit `SLINT_BACKEND` settings are respected. Keep README and changelog counts aligned when tests change.
+The application baseline contains 73 Rust tests, plus 18 release-script tests. Windows uses software rendering by default so basic display drivers without OpenGL shader support can launch the app; explicit `SLINT_BACKEND` settings are respected. Keep README and changelog counts aligned when tests change.
 
 ## macOS
 

@@ -39,6 +39,49 @@ pub fn labels(lang: Language) -> [&'static str; 16] {
     }
 }
 
+fn service_counts(services: impl Iterator<Item = backup::Service>) -> String {
+    let mut codex = 0;
+    let mut claude = 0;
+    for service in services {
+        match service {
+            backup::Service::Codex => codex += 1,
+            backup::Service::ClaudeDesktop => claude += 1,
+        }
+    }
+    format!("Codex: {codex} · Claude Desktop: {claude}")
+}
+
+fn location_hint(lang: Language) -> &'static str {
+    match lang {
+        Language::ZhCn => "账户列表按服务分别显示，请在左侧切换 Codex / Claude Desktop 查看。",
+        Language::ZhTw => "帳戶清單依服務分別顯示，請在左側切換 Codex / Claude Desktop 查看。",
+        Language::En => "Account lists are separate. Select Codex or Claude Desktop in the sidebar to view them.",
+        Language::Ja => "一覧はサービス別です。左側で Codex / Claude Desktop を切り替えて確認してください。",
+        Language::Ko => "계정 목록은 서비스별로 표시됩니다. 왼쪽에서 Codex / Claude Desktop을 전환하세요.",
+        Language::Fr => "Les listes sont séparées. Sélectionnez Codex ou Claude Desktop dans la barre latérale.",
+        Language::Es => "Las listas están separadas. Seleccione Codex o Claude Desktop en la barra lateral.",
+    }
+}
+
+fn import_rows(plan: &backup::ImportPlan, text: &[&str; 16]) -> Vec<String> {
+    plan.entries
+        .iter()
+        .map(|e| {
+            let action = if e.alias != e.original_alias {
+                format!("{} → {}", text[9], e.alias)
+            } else {
+                text[7].to_string()
+            };
+            format!("{} · {} · {}", e.service.label(), e.original_alias, action)
+        })
+        .chain(
+            plan.skipped
+                .iter()
+                .map(|e| format!("{} · {} · {}", e.service.label(), e.alias, text[8])),
+        )
+        .collect()
+}
+
 pub fn filter(window: &MainWindow) {
     let query = window.get_account_query().to_string().trim().to_lowercase();
     let rows = window
@@ -115,8 +158,9 @@ pub fn connect(window: &MainWindow, tray: &AppTray, shared: Arc<Mutex<AppShared>
         let Some(w) = weak.upgrade() else {
             return;
         };
-        let text = labels(state.lock().unwrap().lang);
-        w.set_backup_confirm_label(confirm_label(state.lock().unwrap().lang, false).into());
+        let lang = state.lock().unwrap().lang;
+        let text = labels(lang);
+        w.set_backup_confirm_label(confirm_label(lang, false).into());
         let Some(path) = rfd::FileDialog::new()
             .set_title(text[1])
             .add_filter("Account backup", &["casbackup"])
@@ -133,30 +177,22 @@ pub fn connect(window: &MainWindow, tray: &AppTray, shared: Arc<Mutex<AppShared>
                     .count();
                 let summary = text[6]
                     .replace("{add}", &plan.entries.len().to_string())
-                    .replace("{skip}", &plan.skipped.to_string())
+                    .replace("{skip}", &plan.skipped.len().to_string())
                     .replace("{rename}", &renamed.to_string());
-                let rows = plan
-                    .entries
-                    .iter()
-                    .map(|e| {
-                        format!(
-                            "{} · {}  {}{}",
-                            e.service.label(),
-                            e.original_alias,
-                            if e.alias != e.original_alias {
-                                "→ "
-                            } else {
-                                ""
-                            },
-                            if e.alias != e.original_alias {
-                                &e.alias
-                            } else {
-                                text[7]
-                            }
-                        )
-                    })
-                    .collect();
-                panel(&w, &summary, text[15], rows, !plan.entries.is_empty());
+                let counts = service_counts(
+                    plan.entries
+                        .iter()
+                        .map(|e| e.service)
+                        .chain(plan.skipped.iter().map(|e| e.service)),
+                );
+                let message = format!("{counts}\n{}\n{}", location_hint(lang), text[15]);
+                panel(
+                    &w,
+                    &summary,
+                    &message,
+                    import_rows(&plan, &text),
+                    !plan.entries.is_empty(),
+                );
                 *action.lock().unwrap() = Some(Action::Import(plan));
             }
             Err(error) => {
@@ -171,7 +207,8 @@ pub fn connect(window: &MainWindow, tray: &AppTray, shared: Arc<Mutex<AppShared>
         let Some(w) = weak.upgrade() else {
             return;
         };
-        let text = labels(shared.lock().unwrap().lang);
+        let lang = shared.lock().unwrap().lang;
+        let text = labels(lang);
         let Some(action) = pending.lock().unwrap().take() else {
             return;
         };
@@ -191,10 +228,19 @@ pub fn connect(window: &MainWindow, tray: &AppTray, shared: Arc<Mutex<AppShared>
                     w.set_backup_open(false);
                     return;
                 };
-                backup::export(&paths::app_home(), &path).map(|count| {
+                backup::export(&paths::app_home(), &path).map(|accounts| {
                     (
-                        text[10].replace("{count}", &count.to_string()),
-                        path.display().to_string(),
+                        text[10].replace("{count}", &accounts.len().to_string()),
+                        format!(
+                            "{}\n{}\n{}",
+                            service_counts(accounts.iter().map(|e| e.service)),
+                            location_hint(lang),
+                            path.display()
+                        ),
+                        accounts
+                            .iter()
+                            .map(|e| format!("{} · {}", e.service.label(), e.alias))
+                            .collect(),
                     )
                 })
             }
@@ -202,17 +248,26 @@ pub fn connect(window: &MainWindow, tray: &AppTray, shared: Arc<Mutex<AppShared>
                 w.set_account_query(SharedString::new());
                 (
                     text[11].replace("{count}", &count.to_string()),
-                    String::new(),
+                    format!(
+                        "{}\n{}: {}\n{}",
+                        service_counts(plan.entries.iter().map(|e| e.service)),
+                        text[8],
+                        plan.skipped.len(),
+                        location_hint(lang)
+                    ),
+                    import_rows(&plan, &text),
                 )
             }),
         };
         match result {
-            Ok((message, path)) => {
+            Ok((message, body, rows)) => {
                 if let Some(t) = tray_weak.upgrade() {
                     refresh_ui(&w, &t, &shared);
                 }
-                w.set_status_text(message.clone().into());
-                panel(&w, &message, &path, Vec::new(), false);
+                w.set_status_text(
+                    format!("{message} · {}", body.lines().next().unwrap_or_default()).into(),
+                );
+                panel(&w, &message, &body, rows, false);
             }
             Err(error) => panel(&w, text[12], &error.to_string(), Vec::new(), false),
         }
@@ -222,6 +277,39 @@ pub fn connect(window: &MainWindow, tray: &AppTray, shared: Arc<Mutex<AppShared>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn counts_include_both_services_and_skipped_rows_stay_visible() {
+        use backup::{AccountSummary, Service};
+        let plan = backup::ImportPlan {
+            entries: Vec::new(),
+            skipped: vec![
+                AccountSummary {
+                    service: Service::Codex,
+                    alias: "work".into(),
+                },
+                AccountSummary {
+                    service: Service::Codex,
+                    alias: "personal".into(),
+                },
+                AccountSummary {
+                    service: Service::Codex,
+                    alias: "travel".into(),
+                },
+                AccountSummary {
+                    service: Service::ClaudeDesktop,
+                    alias: "claude".into(),
+                },
+            ],
+        };
+        assert_eq!(
+            service_counts(plan.skipped.iter().map(|e| e.service)),
+            "Codex: 3 · Claude Desktop: 1"
+        );
+        let rows = import_rows(&plan, &labels(Language::ZhCn));
+        assert_eq!(rows.len(), 4);
+        assert_eq!(rows[3], "Claude Desktop · claude · 跳过");
+    }
+
     #[test]
     fn search_matches_name_email_and_plan_without_case() {
         let row = AccountRow {

@@ -19,6 +19,7 @@ The bottom sidebar links to [GCSA products](https://gcsa.org/products) and [GitH
 
 - Search by name, email or plan. Compact cards keep usage, resets and recommendations visible, with separate Details, Analytics and Switch actions.
 - Export all saves Codex and Claude Desktop profiles into one `.casbackup` file. Import previews additions, identical-data skips and renamed conflicts before confirmation.
+- Backup totals include both services. Results show separate Codex / Claude Desktop counts and account names; use the sidebar to view each service. For example, 3 Codex + 1 Claude Desktop = 4 backed-up accounts. Skipped identical entries remain visible in import previews.
 - Backups contain credentials and are **not encrypted**. Keep them in a trusted local location. Identical data is skipped; conflicts use `-import-2` and similar suffixes. Existing accounts and active logins are unchanged. Export never overwrites existing files.
 - Includes saved `auth.json` and Claude Cookies; excludes unsaved live sessions, analytics caches, system keys and deleted accounts. Claude may need sign-in again on another computer.
 - Limits: 500 accounts, 48 MiB raw data, 64 MiB backup file. All entries are validated before writing; write failures roll back new accounts. Refresh after an abnormal interruption. macOS backups are readable/writable only by the current user.
@@ -157,7 +158,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
 ```
 
-The current baseline is 72 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
+The current baseline is 73 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
 
 ## Security and release boundary
 

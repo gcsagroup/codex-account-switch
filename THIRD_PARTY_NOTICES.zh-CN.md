@@ -21,6 +21,7 @@ Codex Account Switch 使用以下开源或第三方组件。版本来自当前 `
 | arboard | 3.6.1 | 剪贴板访问 | MIT OR Apache-2.0 | https://github.com/1Password/arboard |
 | base64 | 0.22.1 | 账号令牌解析 | MIT OR Apache-2.0 | https://github.com/marshallpierce/rust-base64 |
 | chrono | 0.4.45 | 时间与重置时间格式化 | MIT OR Apache-2.0 | https://github.com/chronotope/chrono |
+| embed-resource | 3.0.11 | Windows 可执行文件图标资源（构建时） | MIT | https://github.com/nabijaczleweli/rust-embed-resource |
 | fs4 | 0.13.1 | 文件锁 | MIT OR Apache-2.0 | https://github.com/al8n/fs4-rs |
 | reqwest | 0.12.28 | HTTPS 请求 | MIT OR Apache-2.0 | https://github.com/seanmonstar/reqwest |
 | rustls | 0.23.43 | TLS 实现 | Apache-2.0 OR ISC OR MIT | https://github.com/rustls/rustls |

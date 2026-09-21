@@ -21,6 +21,7 @@ Codex Account Switch 使用以下開放原始碼或第三方元件。版本取�
 | arboard | 3.6.1 | 剪貼簿存取 | MIT OR Apache-2.0 | https://github.com/1Password/arboard |
 | base64 | 0.22.1 | 帳戶權杖解析 | MIT OR Apache-2.0 | https://github.com/marshallpierce/rust-base64 |
 | chrono | 0.4.45 | 時間與重設時間格式化 | MIT OR Apache-2.0 | https://github.com/chronotope/chrono |
+| embed-resource | 3.0.11 | Windows 執行檔圖示資源（建置時） | MIT | https://github.com/nabijaczleweli/rust-embed-resource |
 | fs4 | 0.13.1 | 檔案鎖定 | MIT OR Apache-2.0 | https://github.com/al8n/fs4-rs |
 | reqwest | 0.12.28 | HTTPS 請求 | MIT OR Apache-2.0 | https://github.com/seanmonstar/reqwest |
 | rustls | 0.23.43 | TLS 實作 | Apache-2.0 OR ISC OR MIT | https://github.com/rustls/rustls |

@@ -10,7 +10,7 @@
 
 构建号由准备任务统一生成（1000 + workflow 运行序号 × 100 + 重试次数），只在 runner 写入 `BUILD_NUMBER`。不会自动提交文件，避免循环触发。完整重跑有新标签；单独重跑失败任务沿用准备任务的输出。
 
-- Windows：x64 与 x86 分别使用 MSVC、静态 CRT，运行测试、Release 构建、PE 架构检查和 10 秒隔离启动检查。发布两个 ZIP，含程序、许可证、第三方声明、版本／提交信息。启动检查不使用真实账号，不代表切换和托盘完整验收。
+- Windows：x64 与 x86 分别使用 MSVC、静态 CRT，运行测试、Release 构建、PE 架构、内嵌多尺寸图标检查和 10 秒隔离启动检查。发布两个 ZIP，含程序、许可证、第三方声明、版本／提交信息。启动检查不使用真实账号，不代表切换和托盘完整验收。
 - macOS：自动构建 arm64；默认仅上传公司签名的新包。管理员在仓库 Actions Secrets 设置 `MACOS_SIGNING_P12_B64`（P12 的 base64）、`MACOS_SIGNING_PASSWORD`、`MACOS_SIGNING_IDENTITY`（Global Cybersecurity Alliance Limited 身份）。证书只导入临时 keychain，任务结束删除；不会自动导出开发机私钥。尚不执行公证。
 - 签名配置缺失：发布说明显示 macOS 等待公司签名，仍发布 Windows。管理员显式设置 Actions Variable `MACOS_ALLOW_UNSIGNED=true` 可改为附无公司签名、临时签名的 macOS 测试包。签名配置存在但失败时整个发布失败，不静默降级。
 - 汇总任务核对各包来源提交、版本、构建号、SHA256、ZIP 内容，并生成 `BUILD_INFO.json` 与 `SHA256SUMS.txt`。先创建草稿，全部附件上传后公开；失败时不公开不完整新版本。
@@ -57,7 +57,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-当前应用基线包含 72 项 Rust 测试，另有 16 项发布脚本测试。Windows 默认软件渲染，避免基础显示驱动缺少 OpenGL shader 支持而无法启动；保留显式 `SLINT_BACKEND` 设置。测试数量变化时，应同步更新 README 和 CHANGELOG 中的状态说明。
+当前应用基线包含 73 项 Rust 测试，另有 18 项发布脚本测试。Windows 默认软件渲染，避免基础显示驱动缺少 OpenGL shader 支持而无法启动；保留显式 `SLINT_BACKEND` 设置。测试数量变化时，应同步更新 README 和 CHANGELOG 中的状态说明。
 
 ## macOS
 

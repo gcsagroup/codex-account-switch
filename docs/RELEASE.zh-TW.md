@@ -10,7 +10,7 @@
 
 準備任務統一產生建置號（1000 + workflow 執行序號 × 100 + 重試次數），只在 runner 寫入 `BUILD_NUMBER`，不回寫原始碼。完整重跑產生新標籤；單獨重跑失敗任務沿用原輸出。
 
-- Windows x64／x86 使用 MSVC 及靜態 CRT，執行測試、建置、PE 架構檢查及 10 秒空資料目錄啟動檢查。兩份 ZIP 包含程式、授權和來源資訊；未簽名，啟動檢查不等同完整互動驗收。
+- Windows x64／x86 使用 MSVC 及靜態 CRT，執行測試、建置、PE 架構、內嵌多尺寸圖示檢查及 10 秒空資料目錄啟動檢查。兩份 ZIP 包含程式、授權和來源資訊；未簽名，啟動檢查不等同完整互動驗收。
 - macOS 自動建置 arm64；公司簽名需管理員設定 Actions Secrets：`MACOS_SIGNING_P12_B64`、`MACOS_SIGNING_PASSWORD`、`MACOS_SIGNING_IDENTITY`，身份必須屬於 Global Cybersecurity Alliance Limited。只使用臨時 keychain，任務結束清除，不自動匯出本機私鑰；尚未公證。
 - 缺少公司簽名設定時只暫停 macOS 附件，Windows 照常發布。管理員明確設定 Actions Variable `MACOS_ALLOW_UNSIGNED=true` 可發布臨時簽名、無公司簽名測試包。已有設定但簽名失敗時不降級發布。
 - 發布前核驗來源提交、版本、建置號、SHA256 及 ZIP 內容；產生 `BUILD_INFO.json` 和 `SHA256SUMS.txt`。先上傳草稿全部附件再公開，失敗不公開不完整版本。
@@ -53,7 +53,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-應用程式基線包含 72 項 Rust 測試，另有 16 項發布腳本測試。Windows 預設使用軟體繪製，避免基礎顯示驅動缺少 OpenGL shader 支援而無法啟動；保留明確設定的 `SLINT_BACKEND`。數量變更時同步更新 README 和 CHANGELOG。
+應用程式基線包含 73 項 Rust 測試，另有 18 項發布腳本測試。Windows 預設使用軟體繪製，避免基礎顯示驅動缺少 OpenGL shader 支援而無法啟動；保留明確設定的 `SLINT_BACKEND`。數量變更時同步更新 README 和 CHANGELOG。
 
 ## macOS
 

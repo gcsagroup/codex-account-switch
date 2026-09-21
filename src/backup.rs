@@ -68,7 +68,12 @@ pub struct PlannedEntry {
 
 pub struct ImportPlan {
     pub entries: Vec<PlannedEntry>,
-    pub skipped: usize,
+    pub skipped: Vec<AccountSummary>,
+}
+
+pub struct AccountSummary {
+    pub service: Service,
+    pub alias: String,
 }
 
 fn read_limited(path: &Path) -> AppResult<Vec<u8>> {
@@ -140,14 +145,20 @@ fn saved(root: &Path) -> AppResult<Vec<PlannedEntry>> {
     Ok(entries)
 }
 
-pub fn export(root: &Path, destination: &Path) -> AppResult<usize> {
+pub fn export(root: &Path, destination: &Path) -> AppResult<Vec<AccountSummary>> {
     profile::ensure_private_dir(root)?;
     let _locks = lock_stores(root)?;
     let entries = saved(root)?;
     if entries.is_empty() {
         return Err(AppError::msg("没有可导出的已保存账户"));
     }
-    let count = entries.len();
+    let summary = entries
+        .iter()
+        .map(|entry| AccountSummary {
+            service: entry.service,
+            alias: entry.alias.clone(),
+        })
+        .collect();
     let mut accounts = Vec::new();
     for entry in entries {
         validate(entry.service, &entry.bytes, root)
@@ -169,7 +180,7 @@ pub fn export(root: &Path, destination: &Path) -> AppResult<usize> {
         return Err(AppError::msg("备份超过 64 MiB 限制"));
     }
     write_new(destination, &bytes)?;
-    Ok(count)
+    Ok(summary)
 }
 
 pub fn preview(root: &Path, source: &Path) -> AppResult<ImportPlan> {
@@ -196,7 +207,7 @@ pub fn preview(root: &Path, source: &Path) -> AppResult<ImportPlan> {
     }
     let mut plan = ImportPlan {
         entries: Vec::new(),
-        skipped: 0,
+        skipped: Vec::new(),
     };
     let mut source_names = HashSet::new();
     for entry in archive.accounts {
@@ -216,7 +227,10 @@ pub fn preview(root: &Path, source: &Path) -> AppResult<ImportPlan> {
             .chain(plan.entries.iter())
             .any(|p| p.service == entry.service && p.bytes == bytes)
         {
-            plan.skipped += 1;
+            plan.skipped.push(AccountSummary {
+                service: entry.service,
+                alias: entry.alias,
+            });
             continue;
         }
         let mut alias = entry.alias.clone();
@@ -378,14 +392,43 @@ mod tests {
         let dest = tempfile::tempdir().unwrap();
         let file = source.path().join("accounts.casbackup");
         seed(source.path(), "work", "fixture-work");
+        seed(source.path(), "personal", "fixture-personal");
+        seed(source.path(), "travel", "fixture-travel");
         let folder = source.path().join("claude-desktop/profiles/claude");
         fs::create_dir_all(&folder).unwrap();
         let db = rusqlite::Connection::open(folder.join("Cookies")).unwrap();
         db.execute_batch("CREATE TABLE cookies (name TEXT, value TEXT); INSERT INTO cookies VALUES ('fixture', 'local-only');").unwrap();
         drop(db);
-        assert_eq!(export(source.path(), &file).unwrap(), 2);
+        let accounts = export(source.path(), &file).unwrap();
+        assert_eq!(accounts.len(), 4);
+        assert_eq!(
+            accounts
+                .iter()
+                .filter(|e| e.service == Service::Codex)
+                .count(),
+            3
+        );
+        assert_eq!(
+            accounts
+                .iter()
+                .filter(|e| e.service == Service::ClaudeDesktop)
+                .count(),
+            1
+        );
+        let archive: Archive = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+        assert_eq!(archive.accounts.len(), 4);
         let plan = preview(dest.path(), &file).unwrap();
-        assert_eq!(apply(dest.path(), &plan).unwrap(), 2);
+        assert_eq!(apply(dest.path(), &plan).unwrap(), 4);
+        assert_eq!(
+            fs::read_dir(dest.path().join("profiles")).unwrap().count(),
+            3
+        );
+        assert_eq!(
+            fs::read_dir(dest.path().join("claude-desktop/profiles"))
+                .unwrap()
+                .count(),
+            1
+        );
         assert_eq!(
             profile::ProfileStore::new(dest.path().into())
                 .read_profile_bytes("work")
@@ -398,7 +441,7 @@ mod tests {
         .unwrap();
         let repeat = preview(dest.path(), &file).unwrap();
         assert!(repeat.entries.is_empty());
-        assert_eq!(repeat.skipped, 2);
+        assert_eq!(repeat.skipped.len(), 4);
         assert!(!dest.path().join("current").exists());
         assert!(!dest.path().join("claude-desktop/current").exists());
     }
@@ -417,7 +460,8 @@ mod tests {
             ],
         );
         let plan = preview(root.path(), &file).unwrap();
-        assert_eq!(plan.skipped, 1);
+        assert_eq!(plan.skipped.len(), 1);
+        assert_eq!(plan.skipped[0].alias, "copy");
         assert_eq!(plan.entries[0].alias, "work-import-2");
         apply(root.path(), &plan).unwrap();
         assert_eq!(

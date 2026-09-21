@@ -21,6 +21,7 @@ Codex Account Switch uses the open-source and third-party components listed belo
 | arboard | 3.6.1 | Clipboard access | MIT OR Apache-2.0 | https://github.com/1Password/arboard |
 | base64 | 0.22.1 | Account token parsing | MIT OR Apache-2.0 | https://github.com/marshallpierce/rust-base64 |
 | chrono | 0.4.45 | Time and reset-time formatting | MIT OR Apache-2.0 | https://github.com/chronotope/chrono |
+| embed-resource | 3.0.11 | Windows executable icon resources (build time) | MIT | https://github.com/nabijaczleweli/rust-embed-resource |
 | fs4 | 0.13.1 | File locking | MIT OR Apache-2.0 | https://github.com/al8n/fs4-rs |
 | reqwest | 0.12.28 | HTTPS requests | MIT OR Apache-2.0 | https://github.com/seanmonstar/reqwest |
 | rustls | 0.23.43 | TLS implementation | Apache-2.0 OR ISC OR MIT | https://github.com/rustls/rustls |

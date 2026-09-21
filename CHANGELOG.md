@@ -4,6 +4,13 @@
 
 This log records source changes and local verification; a Git tag does not imply a published GitHub Release.
 
+## 1.4.1 - 2026-09-22
+
+- Embed multi-resolution Windows EXE icons and set the application window icon. Release packaging rejects missing icon resources or missing required sizes.
+- Export results, import previews and import results show Codex / Claude Desktop counts and account names. The sidebar separates service lists: 3 Codex plus 1 Claude account correctly totals 4.
+- Keep identical-data skips visible in import previews and results; preserve existing conflict handling and active logins.
+- Add a 3+1 account round-trip regression and Windows icon-resource checks for both PE architectures.
+
 ## 1.4.0 - 2026-09-21
 
 - Add SSH delivery of locally company-signed macOS packages, verifying the source inputs and matching Windows release before combining all platforms. Signing keys stay local.
