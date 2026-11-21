@@ -5,7 +5,7 @@ use chrono::NaiveDate;
 use serde::Deserialize;
 
 use crate::analytics::ActivityResponse;
-use crate::valuation::{Assumptions, TokenSeries, OFFICIAL_PRICES};
+use crate::valuation::{Assumptions, TokenSeries};
 
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct DetailedUsage {
@@ -52,18 +52,13 @@ pub struct AutomaticCost {
     pub priced_tokens: f64,
     pub unpriced_tokens: f64,
     pub total: Option<f64>,
+    pub classified_usd: f64,
+    pub estimated_usd: f64,
 }
 
-fn prices(name: &str) -> Option<(f64, f64, f64)> {
-    // 不猜测内部别名、日期别名或未知模型的价目。
-    OFFICIAL_PRICES
-        .iter()
-        .find(|p| p.0 == name)
-        .map(|p| (p.1, p.2, p.3))
-}
-
-fn cost(row: &ModelCost) -> Option<f64> {
-    let (input, cached, output) = prices(&row.model)?;
+fn cost(row: &ModelCost, assumptions: &Assumptions) -> Option<f64> {
+    let (input, cached, output) =
+        crate::valuation::scenario_prices(&row.model, assumptions.speed, assumptions.long_context)?;
     Some((row.input * input + row.cached * cached + row.output * output) / 1_000_000.)
 }
 
@@ -111,7 +106,7 @@ pub fn calculate(
     assumptions: &Assumptions,
 ) -> AutomaticCost {
     let mut result = AutomaticCost::default();
-    let mut combined: BTreeMap<String, ModelCost> = BTreeMap::new();
+    let mut combined: BTreeMap<(String, bool), ModelCost> = BTreeMap::new();
     for (index, date) in dates.iter().enumerate() {
         let exact: Vec<_> = details
             .into_iter()
@@ -213,15 +208,20 @@ pub fn calculate(
             }
         }
         for mut row in rows {
-            row.usd = cost(&row);
+            row.usd = cost(&row, assumptions);
             if let Some(usd) = row.usd {
                 *day_cost.get_or_insert(0.) += usd;
                 result.priced_tokens += row.tokens;
+                if row.estimated {
+                    result.estimated_usd += usd;
+                } else {
+                    result.classified_usd += usd;
+                }
             } else {
                 result.unpriced_tokens += row.tokens;
             }
             let entry = combined
-                .entry(row.model.clone())
+                .entry((row.model.clone(), row.estimated))
                 .or_insert_with(|| ModelCost {
                     model: row.model.clone(),
                     ..Default::default()

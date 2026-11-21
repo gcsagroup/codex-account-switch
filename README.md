@@ -8,7 +8,7 @@ Built with **Rust 1.97.1**, **Slint 1.17**, and bundled SQLite. The UI does not 
 
 ## Project status
 
-- Automatic updates: every `main` push publishes an independent testing prerelease on [Releases](https://github.com/gcsagroup/codex-account-switch/releases) after checks pass. No manual tag is needed. Base version: 1.4.0; tags use `vVERSION-ci.RUN_ID.ATTEMPT`, with increasing application build numbers. Other branches and PRs only run checks.
+- Automatic updates: every `main` push publishes an independent testing prerelease on [Releases](https://github.com/gcsagroup/codex-account-switch/releases) after checks pass. No manual tag is needed. Base version: 3.0.0; tags use `vVERSION-ci.RUN_ID.ATTEMPT`, with increasing application build numbers. Other branches and PRs only run checks.
 - Windows: x64/x86 ZIPs include the executable, licenses and build metadata. Each architecture runs tests, builds and an isolated startup check. Packages are unsigned; real-account switching and tray interactions still need manual acceptance.
 - macOS: CI builds arm64; new packages require company signing by default. Missing configuration is disclosed without blocking Windows releases. Administrators may explicitly set `MACOS_ALLOW_UNSIGNED=true` for packages without company signing. The [historical v1.3.0 company-signed package](https://github.com/gcsagroup/codex-account-switch/releases/tag/v1.3.0) remains available and is not notarized.
 - Linux: not currently supported or release-tested.
@@ -40,6 +40,18 @@ The bottom sidebar links to [GCSA products](https://gcsa.org/products) and [GitH
 - Uses the [official standard short-context price snapshot](https://developers.openai.com/api/docs/pricing) verified on 2026-09-16. The default 80% input / 50% cached-input assumptions apply only to estimated portions. Values are not bills and exclude long context, fast mode, cache writes and tool surcharges.
 - Expand an account and open Reset history to read official received/used events for the past 30 days. All pages are read, deduplicated and sorted newest first in local time. Failed refreshes preserve the complete cache. The private `cache/reset-history.json` persists across restarts and separates real account IDs. This is read-only and consumes no reset credits.
 - Local session logs lack reliable account attribution and are not pooled into valuations. Personal accounts may not expose workspace token details; the UI states this limitation and coverage.
+
+
+Account cards now show weekly remaining quota and rounded credit balances. Details separate owned resets from currently usable resets and show expiry dates, estimated messages and model/limit status; reset history loads using its event schema. Missing percentages stay unknown. See [acceptance evidence](docs/2026-11-21-quota-release-acceptance.zh-CN.md).
+
+### Analysis workspace (Ver 3.0)
+
+- Selected 7/30-day metrics show separate Token, turn and consumption coverage. Missing values, explicit zero, unsupported dimensions and stale responses are distinguished; lifetime and 52-week activity are collapsed separately.
+- Daily trends, category rankings, daily detail and CSV exports retain scope, units, coverage and pricing assumptions. Model/source filters affect consumption only and persist per account.
+- Prices were verified on 2026-11-14, with the historical 2026-09-16 snapshot retained for gpt-5.3-codex. Standard/Fast/Ultrafast and short/long context are manually selected scenarios, not detected billing tiers. Unverified combinations remain unpriced; cache-write prices are reference-only without classified usage.
+- Compare complete 7/30-day UTC calendar periods excluding today. Missing data, changed units, failed refreshes and zero baselines suppress misleading percentages.
+- Local project/chat analysis reads only the local SQLite index, never chat bodies. It filters by update date and shows cumulative chat tokens separately from cloud account totals. Unknown creators remain filterable; a creator match does not prove usage ownership.
+- Purpose tags are local and manual, not official workspace classifications. At most the latest 10,000 records are read with an explicit truncation notice. Record counts are not completed-task counts. New analysis controls currently use Chinese labels.
 
 
 ## Features
@@ -158,7 +170,7 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
 ```
 
-The current baseline is 73 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
+The isolated analysis and quota changes pass 92 tests covering identity parsing, imports, permissions, recoverable deletion, transactional switching, detail preview, Claude SQLite handling, usage windows, reset credits, and activity parsing.
 
 ## Security and release boundary
 

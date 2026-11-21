@@ -1,16 +1,19 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod account_order;
+mod analysis_report;
 mod analysis_ui;
 mod analytics;
 mod backup;
 mod claude;
 mod error;
 mod identity;
+mod local_analysis;
 mod login;
 mod model_valuation;
 mod paths;
 mod profile;
+mod quota;
 mod reset_history;
 mod restart;
 mod switcher;
@@ -34,8 +37,7 @@ use crate::switcher::Switcher;
 use crate::usage::{
     format_reset, format_usage_row, format_usage_short, format_window_reset,
     format_window_reset_short, normalized_cumulative_buckets, normalized_daily_tokens,
-    normalized_usage_buckets, recent_daily_tokens, window_has_data, window_is_expired,
-    UsageSnapshot,
+    normalized_usage_buckets, recent_daily_tokens, window_is_expired, UsageSnapshot,
 };
 
 mod i18n;
@@ -1296,7 +1298,18 @@ fn spawn_usage_refresh(
                     let previous_token_profile = previous
                         .as_ref()
                         .and_then(|snapshot| snapshot.token_profile.clone());
-                    let usage_result = usage::fetch_usage(&alias, &token, &account_id);
+                    let usage_result =
+                        usage::fetch_usage(&alias, &token, &account_id).map(|mut s| {
+                            s.reset_details = quota::fetch_resets(
+                                &token,
+                                &account_id,
+                                previous
+                                    .as_ref()
+                                    .map(|p| p.reset_details.clone())
+                                    .unwrap_or_default(),
+                            );
+                            s
+                        });
                     let token_result =
                         usage::fetch_token_usage_profile(&alias, &token, &account_id);
                     match (usage_result, token_result) {
@@ -1471,6 +1484,15 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
                 })
                 .unwrap_or_else(|| (i18n::t(lang, "usage.pending_refresh").into(), false));
             AccountRow {
+                quota_stale: snap.is_some_and(|s| {
+                    !s.error.is_empty()
+                        || s.fetched_at <= 0
+                        || !(0..=900).contains(&(now - s.fetched_at))
+                }),
+                quota_details: snap
+                    .map(|s| quota::details(s, now))
+                    .unwrap_or_else(|| "尚未读取额度详情".into())
+                    .into(),
                 alias: p.alias.clone().into(),
                 email: p.identity.email.clone().into(),
                 plan: p.identity.plan.clone().into(),
@@ -1487,21 +1509,15 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
                     .map(|s| format_window_reset_short(&s.secondary))
                     .unwrap_or_else(|| "—".into())
                     .into(),
-                primary_available: snap.is_some_and(|s| {
-                    window_has_data(&s.primary) && !window_is_expired(&s.primary, now)
-                }),
-                secondary_available: snap.is_some_and(|s| {
-                    window_has_data(&s.secondary) && !window_is_expired(&s.secondary, now)
-                }),
+                primary_available: snap
+                    .is_some_and(|s| usage::window_usage_available(&s.primary, now)),
+                secondary_available: snap
+                    .is_some_and(|s| usage::window_usage_available(&s.secondary, now)),
                 credits: snap
-                    .map(|s| s.credits_balance.clone())
-                    .unwrap_or_default()
+                    .map(quota::balance_summary)
+                    .unwrap_or_else(|| "—".into())
                     .into(),
-                reset_credits: format_reset_credits_available(
-                    snap.and_then(|s| s.reset_credits_available),
-                    lang,
-                )
-                .into(),
+                reset_credits: quota::reset_label(snap).into(),
                 reset_summary: if supports_usage {
                     account_order::reset_summary(snap, now, lang).into()
                 } else {
@@ -1653,6 +1669,8 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
     window.set_tr_label_invalid(i18n::t(lang, "label.invalid").into());
     window.set_tr_gauge_5h(i18n::t(lang, "gauge.5h").into());
     window.set_tr_gauge_weekly(i18n::t(lang, "gauge.weekly").into());
+    window.set_tr_weekly_remaining(i18n::t(lang, "new.weekly_remaining").into());
+    window.set_tr_credits_balance(i18n::t(lang, "new.credits_balance").into());
     window.set_tr_usage_reset(i18n::t(lang, "usage.reset_prefix").into());
     window.set_tr_claude_session_hint(i18n::t(lang, "claude.session_hint").into());
     window.set_tr_claude_login_hint(i18n::t(lang, "claude.login_hint").into());
@@ -1712,11 +1730,10 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
             .unwrap_or_else(|| current.identity.plan.clone())
             .into(),
         );
-        let primary_available = snap
-            .is_some_and(|s| window_has_data(&s.primary) && !window_is_expired(&s.primary, now));
-        let secondary_available = snap.is_some_and(|s| {
-            window_has_data(&s.secondary) && !window_is_expired(&s.secondary, now)
-        });
+        let primary_available =
+            snap.is_some_and(|s| usage::window_usage_available(&s.primary, now));
+        let secondary_available =
+            snap.is_some_and(|s| usage::window_usage_available(&s.secondary, now));
         window.set_current_primary_available(primary_available);
         window.set_current_secondary_available(secondary_available);
         window.set_current_primary(if primary_available {
@@ -1762,14 +1779,11 @@ fn refresh_ui(window: &MainWindow, tray: &AppTray, shared: &Arc<Mutex<AppShared>
             .into(),
         );
         window.set_current_credits(
-            snap.map(|s| s.credits_balance.clone())
-                .unwrap_or_default()
+            snap.map(quota::balance_summary)
+                .unwrap_or_else(|| "—".into())
                 .into(),
         );
-        window.set_current_reset_credits(
-            format_reset_credits_available(snap.and_then(|s| s.reset_credits_available), lang)
-                .into(),
-        );
+        window.set_current_reset_credits(quota::reset_label(snap).into());
         window.set_current_token_lifetime(
             snap.and_then(|s| s.token_profile.as_ref())
                 .and_then(|p| p.lifetime_tokens)
@@ -2018,17 +2032,6 @@ fn resolve_detail_alias(
         .to_string()
 }
 
-fn format_reset_credits_available(count: Option<i64>, lang: i18n::Language) -> String {
-    count
-        .map(|count| {
-            format!(
-                "{} · {count}",
-                i18n::t(lang, "usage.reset_credits_available")
-            )
-        })
-        .unwrap_or_default()
-}
-
 fn format_tokens_localized(value: i64, lang: i18n::Language) -> String {
     match lang {
         i18n::Language::ZhCn => format_east_asian_number(value, "亿", "万"),
@@ -2132,8 +2135,7 @@ fn format_reasoning_effort(value: &str, lang: i18n::Language) -> String {
 
 #[cfg(test)]
 mod detail_preview_tests {
-    use super::{format_reset_credits_available, resolve_detail_alias};
-    use crate::i18n::Language;
+    use super::resolve_detail_alias;
 
     #[test]
     fn valid_preview_alias_controls_detail_panel() {
@@ -2151,18 +2153,5 @@ mod detail_preview_tests {
             resolve_detail_alias(&aliases, "active", Some("removed")),
             "active"
         );
-    }
-
-    #[test]
-    fn reset_credit_label_keeps_zero_visible_and_hides_unknown() {
-        assert_eq!(
-            format_reset_credits_available(Some(0), Language::ZhCn),
-            "可用重置次数 · 0"
-        );
-        assert_eq!(
-            format_reset_credits_available(Some(2), Language::En),
-            "Resets available · 2"
-        );
-        assert_eq!(format_reset_credits_available(None, Language::ZhCn), "");
     }
 }

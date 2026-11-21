@@ -17,11 +17,16 @@ pub struct Assumptions {
     pub cached_input_price: f64,
     pub output_price: f64,
     pub price_date: NaiveDate,
+    #[serde(default)]
+    pub speed: i32,
+    #[serde(default)]
+    pub long_context: bool,
 }
 
 impl Assumptions {
     pub fn validate(&self) -> bool {
-        !self.model.trim().is_empty()
+        (0..=2).contains(&self.speed)
+            && !self.model.trim().is_empty()
             && self.model.chars().count() <= 80
             && [self.input_percent, self.cached_input_percent]
                 .iter()
@@ -36,17 +41,23 @@ impl Assumptions {
         if !self.validate() {
             return None;
         }
+        let rates = if OFFICIAL_PRICES.iter().any(|p| p.0 == self.model) {
+            scenario_prices(&self.model, self.speed, self.long_context)?
+        } else if self.speed == 0 && !self.long_context {
+            (self.input_price, self.cached_input_price, self.output_price)
+        } else {
+            return None;
+        };
         let input = self.input_percent / 100.0;
         let cached = self.cached_input_percent / 100.0;
-        let blended = input
-            * ((1.0 - cached) * self.input_price + cached * self.cached_input_price)
-            + (1.0 - input) * self.output_price;
+        let blended =
+            input * ((1.0 - cached) * rates.0 + cached * rates.1) + (1.0 - input) * rates.2;
         Some(tokens as f64 / 1_000_000.0 * blended)
     }
 }
 
 // 来源：https://developers.openai.com/api/docs/pricing
-// 2026-09-16 核验，Standard / Short context；不是实时同步价格。
+// 2026-11-14 核验，Standard / Short context；旧 gpt-5.3-codex 保留历史快照。
 // 不含缓存写入、长上下文、Fast mode 和地域附加费用。
 pub const OFFICIAL_PRICES: &[(&str, f64, f64, f64)] = &[
     ("gpt-5.6-sol", 4.0, 0.4, 20.0),
@@ -56,7 +67,71 @@ pub const OFFICIAL_PRICES: &[(&str, f64, f64, f64)] = &[
     ("gpt-5.3-codex", 1.75, 0.175, 14.0),
     // https://developers.openai.com/api/docs/models/gpt-5.5
     ("gpt-5.5", 5.0, 0.5, 30.0),
+    // 以下三项于 2026-10-10 核验各模型官方页面，仍为标准短上下文价格。
+    ("gpt-6.1-sol", 2.0, 0.1, 10.0),
+    ("gpt-6-sol", 2.0, 0.2, 10.0),
+    ("gpt-6-luna", 0.1, 0.01, 0.5),
+    ("gpt-6.1-terra", 1.0, 0.05, 5.0),
 ];
+
+pub fn price_date(model: &str) -> NaiveDate {
+    if model == "gpt-5.3-codex" {
+        NaiveDate::from_ymd_opt(2026, 9, 16).unwrap()
+    } else {
+        NaiveDate::from_ymd_opt(2026, 11, 14).unwrap()
+    }
+}
+
+// 仅对官方已核验的组合折算。模型能力、套餐权限与 API 价格是独立事项。
+pub fn scenario_prices(model: &str, speed: i32, long: bool) -> Option<(f64, f64, f64)> {
+    let &(_, input, cached, output) = OFFICIAL_PRICES.iter().find(|p| p.0 == model)?;
+    if model == "gpt-5.3-codex" {
+        return (speed == 0 && !long).then_some((input, cached, output));
+    }
+    let multiplier = match speed {
+        0 => 1.,
+        1 if model == "gpt-5.5" && !long => 2.5,
+        1 if model != "gpt-5.5" => 2.,
+        2 if matches!(model, "gpt-6-astra" | "gpt-6.1-sol") => 6.,
+        _ => return None,
+    };
+    Some((
+        input * multiplier * if long { 2. } else { 1. },
+        cached * multiplier * if long { 2. } else { 1. },
+        output * multiplier * if long { 1.5 } else { 1. },
+    ))
+}
+pub fn scenario_label(a: &Assumptions) -> String {
+    format!(
+        "{} / {} · 手动折算基准，并非已检测到的实际速度或上下文",
+        match a.speed {
+            1 => "Fast",
+            2 => "Ultrafast",
+            _ => "Standard",
+        },
+        if a.long_context {
+            "长上下文 >272K"
+        } else {
+            "短上下文 ≤272K"
+        }
+    )
+}
+pub fn price_reference(a: &Assumptions) -> String {
+    let Some((i, c, o)) = scenario_prices(&a.model, a.speed, a.long_context) else {
+        return "当前模型与速度／上下文组合未提供已核验价格，列为未计价".into();
+    };
+    format!(
+        "{} · 每百万 Token：输入 ${i} / 缓存读取 ${c} / 输出 ${o}\n{} · 核验 {}\n{}",
+        a.model,
+        scenario_label(a),
+        price_date(&a.model),
+        if matches!(a.model.as_str(), "gpt-5.3-codex" | "gpt-5.5") {
+            "该快照未提供缓存写入价；未计入工具费、区域加价与历史价格变化".into()
+        } else {
+            format!("缓存写入参考：30 分钟 ${} / 12 小时 ${}；缺少写入分类 Token，当前折算未计入写入费用。未含工具费与区域加价。",i*1.25,i*2.5)
+        }
+    )
+}
 
 pub fn official_assumption(index: usize) -> Option<Assumptions> {
     let &(model, input_price, cached_input_price, output_price) = OFFICIAL_PRICES.get(index)?;
@@ -67,7 +142,9 @@ pub fn official_assumption(index: usize) -> Option<Assumptions> {
         input_price,
         cached_input_price,
         output_price,
-        price_date: NaiveDate::from_ymd_opt(2026, 9, 16).unwrap(),
+        price_date: price_date(model),
+        speed: 0,
+        long_context: false,
     })
 }
 
@@ -80,6 +157,8 @@ pub fn effective_assumption(saved: Option<&Assumptions>) -> Assumptions {
     if let Some(saved) = saved {
         a.input_percent = saved.input_percent;
         a.cached_input_percent = saved.cached_input_percent;
+        a.speed = saved.speed;
+        a.long_context = saved.long_context;
     }
     a
 }
@@ -178,6 +257,8 @@ mod tests {
             cached_input_price: 0.2,
             output_price: 10.,
             price_date: NaiveDate::from_ymd_opt(2026, 9, 13).unwrap(),
+            speed: 0,
+            long_context: false,
         }
     }
     #[test]
@@ -196,6 +277,30 @@ mod tests {
         for i in 0..OFFICIAL_PRICES.len() {
             assert!(official_assumption(i).unwrap().validate());
         }
+    }
+    #[test]
+    fn verified_scenarios_do_not_invent_unsupported_prices() {
+        assert_eq!(
+            scenario_prices("gpt-6.1-terra", 0, false),
+            Some((1., 0.05, 5.))
+        );
+        assert_eq!(
+            scenario_prices("gpt-6.1-sol", 1, true),
+            Some((8., 0.4, 30.))
+        );
+        assert_eq!(
+            scenario_prices("gpt-6-astra", 2, false),
+            Some((60., 6., 300.))
+        );
+        assert!(scenario_prices("gpt-6.1-terra", 2, false).is_none());
+        assert!(scenario_prices("gpt-5.5", 1, true).is_none());
+        assert!(scenario_prices("new-model", 0, false).is_none());
+        let mut a = official_assumption(6).unwrap();
+        let base = a.usd(1_000_000).unwrap();
+        a.speed = 1;
+        assert_eq!(a.usd(1_000_000), Some(base * 2.));
+        a.long_context = true;
+        assert!(a.usd(1_000_000).unwrap() > base * 2.);
     }
     #[test]
     fn representative_estimate_and_extreme_ratios() {

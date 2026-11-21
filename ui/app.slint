@@ -24,6 +24,8 @@ export struct ValLabels {
 }
 
 export struct AccountRow {
+    quota-details: string,
+    quota-stale: bool,
     alias: string,
     email: string,
     plan: string,
@@ -312,6 +314,60 @@ export struct HistoryRow { title: string, time: string }
 export struct ValuationRow { model: string, detail: string, cost: string }
 export struct AnalysisRank { name: string, value: string, ratio: float }
 
+export struct AnalysisDayRow { date: string, tokens: string, usage: string, detail: string }
+export struct AnalysisHeatCell { intensity: float, detail: string }
+export struct AnalysisHeatMonth { label: string, column: int }
+export struct LocalChatRow { id: string, title: string, detail: string, tokens: string, tag: string }
+
+component AnalysisChart inherits Rectangle {
+    in property <[AnalysisBar]> bars;
+    in property <string> maximum;
+    callback selected(string);
+    height: 200px;
+    Text { text: root.maximum; color: Theme.muted; font-size: 10px; x: 0px; y: 0px; }
+    Text { text: "0"; color: Theme.muted; font-size: 10px; x: 0px; y: parent.height - 34px; }
+    HorizontalBox { padding-left: 76px; spacing: root.bars.length <= 7 ? 10px : 2px;
+        for bar in root.bars: cell := Rectangle {
+            horizontal-stretch: 1;
+            accessible-role: button; accessible-label: bar.detail;
+            accessible-action-default => { root.selected(bar.detail); }
+            forward-focus: bar-focus;
+            border-width: bar-focus.has-focus ? 1px : 0px; border-color: Theme.copper;
+            if bar.segments.length == 0: Text { text: "—"; y: parent.height - 48px; width: parent.width; color: Theme.muted; horizontal-alignment: center; }
+            for segment in bar.segments: Rectangle {
+                x: parent.width * 0.08; width: parent.width * 0.84;
+                y: 20px + (parent.height - 54px) * (1 - segment.offset - segment.fraction);
+                height: max(0px, (parent.height - 54px) * segment.fraction);
+                background: Theme.series(segment.color-index);
+            }
+            Text { text: bar.label; y: parent.height - 24px; width: parent.width; horizontal-alignment: center; color: Theme.muted; font-size: 10px; }
+            bar-focus := FocusScope { key-pressed(e) => { if e.text == " " || e.text == "\n" { root.selected(bar.detail); return accept; } return reject; } }
+            TouchArea { mouse-cursor: pointer; clicked => { root.selected(bar.detail); } }
+        }
+    }
+}
+
+
+component PageHeader inherits HorizontalBox {
+    in property <string> heading;
+    in property <string> subtitle;
+    spacing: 10px;
+    VerticalBox { spacing: 4px; horizontal-stretch: 1;
+        Text { text: heading; font-size: 25px; font-weight: 600; color: Theme.text; }
+        Text { text: subtitle; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
+    }
+    @children
+}
+
+component PanelCard inherits Rectangle {
+    vertical-stretch: 0;
+    background: Theme.panel;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: Theme.line;
+    @children
+}
+
 component RankingPanel inherits Rectangle {
     in property <string> title;
     in property <string> total;
@@ -349,6 +405,61 @@ component RankingPanel inherits Rectangle {
 }
 
 export component MainWindow inherits Window {
+    in-out property <string> analysis-overview;
+    in-out property <string> analysis-consumption;
+    in-out property <string> analysis-dominant;
+    in-out property <string> analysis-coverage;
+    in-out property <string> analysis-comparison;
+    in-out property <string> analysis-action-status;
+    in-out property <string> analysis-detail;
+    in-out property <string> analysis-rank-note;
+    in-out property <[AnalysisDayRow]> analysis-daily-rows;
+    in-out property <[AnalysisRank]> analysis-consumption-rows;
+    in-out property <[AnalysisHeatCell]> analysis-heat-cells;
+    in-out property <[AnalysisHeatMonth]> analysis-heat-months;
+    in-out property <bool> analysis-show-history: false;
+    in-out property <bool> analysis-show-all: false;
+    private property <bool> analysis-show-status: false;
+    private property <bool> analysis-show-table: false;
+    private property <bool> analysis-show-comparison: false;
+    private property <bool> analysis-show-valuation: false;
+    private property <bool> analysis-show-tools: false;
+    private property <bool> analysis-local-mode: false;
+    in-out property <int> analysis-trend-mode: 0;
+    callback export-analysis();
+    callback select-analysis-rank(string);
+    in-out property <int> val-speed-index: 0;
+    in-out property <int> val-context-index: 0;
+    callback change-price-scenario();
+    in-out property <bool> local-busy: false;
+    in-out property <string> local-status: "点击读取本机记录；不读取聊天正文";
+    in-out property <string> local-summary;
+    in-out property <string> local-detail;
+    in-out property <string> local-action-status;
+    in-out property <bool> local-selected: false;
+    in-out property <string> local-tag;
+    in-out property <int> local-scope: 0;
+    in-out property <int> local-group: 0;
+    in-out property <string> local-search;
+    in-out property <[string]> local-project-options: ["全部项目"];
+    in-out property <string> local-project-filter: "全部项目";
+    in-out property <int> local-project-index: 0;
+    in-out property <int> local-page: 0;
+    in-out property <int> local-page-count: 1;
+    in-out property <[LocalChatRow]> local-rows;
+    callback load-local-analysis();
+    callback render-local-analysis();
+    callback select-local-chat(string);
+    callback save-local-tag();
+    callback export-local-analysis();
+    in-out property <string> analysis-composition;
+    in-out property <[string]> analysis-model-options;
+    in-out property <[string]> analysis-source-options;
+    in-out property <int> analysis-model-index;
+    in-out property <int> analysis-source-index;
+    in-out property <string> analysis-model-filter: "全部模型";
+    in-out property <string> analysis-source-filter: "全部来源";
+
     icon: @image-url("../assets/app-icon-1024.png");
     init => { Palette.color-scheme = ColorScheme.dark; }
     title: "Codex Account Switch";
@@ -508,6 +619,8 @@ export component MainWindow inherits Window {
     in-out property <string> tr-more: "更多";
     in-out property <string> tr-loading: "更新中…";
     in-out property <string> tr-weekly-used: "每周已用";
+    in-out property <string> tr-weekly-remaining: "每周剩余";
+    in-out property <string> tr-credits-balance: "额度余额";
     in-out property <string> tr-days: "天";
     in-out property <string> tr-plan-usage: "套餐用量";
     in-out property <string> tr-by-product: "按产品";
@@ -904,11 +1017,12 @@ export component MainWindow inherits Window {
                                         Text { text: acc.alias + "  " + acc.plan + (acc.is_current ? " · " + tr-label-in-use : ""); font-size: 14px; font-weight: 600; color: Theme.text; overflow: elide; }
                                         Text { text: acc.email; font-size: 11px; color: Theme.muted; overflow: elide; }
                                     }
-                                    if provider-index == 0: VerticalBox { width: 134px; horizontal-stretch: 0; spacing: 6px; alignment: center;
-                                        Text { text: acc.secondary_available ? tr-weekly-used + " " + Math.round(acc.secondary_pct) + "%" : acc.usage_summary; font-size: 11px; color: acc.usage_attention ? Theme.copper : Theme.muted; overflow: elide; }
+                                    if provider-index == 0: VerticalBox { width: 180px; horizontal-stretch: 0; spacing: 6px; alignment: center;
+                                        Text { text: (acc.secondary_available ? tr-weekly-remaining + " " + Math.round(Math.max(0, Math.min(100, 100 - acc.secondary_pct))) + "%" : acc.usage_summary != "" ? acc.usage_summary : tr-weekly-remaining + " —") + (acc.quota-stale ? " · " + tr-cached : ""); font-size: 11px; color: acc.usage_attention ? Theme.copper : Theme.text; wrap: word-wrap; }
                                         Rectangle { height: 4px; border-radius: 2px; background: Theme.line;
-                                            Rectangle { width: parent.width * Math.min(1, Math.max(0, acc.secondary_pct / 100)); height: parent.height; border-radius: 2px; background: acc.secondary_pct >= 90 ? Theme.copper : Theme.ok; visible: acc.secondary_available; }
+                                            Rectangle { x: 0px; y: 0px; width: parent.width * Math.min(1, Math.max(0, 1 - acc.secondary_pct / 100)); height: parent.height; border-radius: 2px; background: acc.quota-stale ? Theme.muted : acc.secondary_pct >= 90 ? Theme.copper : Theme.ok; visible: acc.secondary_available; }
                                         }
+                                        Text { text: tr-credits-balance + " " + acc.credits; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
                                     }
                                     GhostButton { label: tr-detail-title + (account-row.details ? " ▴" : " ▾"); solid: account-row.details; clicked => { if account-row.details { root.expanded-account = ""; } else { root.expanded-account = acc.alias; root.preview-account(acc.alias); } } }
                                     GhostButton { label: tr-more; solid: account-row.expanded; clicked => { account-row.expanded = !account-row.expanded; } }
@@ -928,10 +1042,10 @@ export component MainWindow inherits Window {
                                     if provider-index == 0: HorizontalBox {
                                         spacing: 24px;
                                         VerticalBox { spacing: 5px; horizontal-stretch: 2;
-                                            Text { text: tr-weekly-used + (current-stale ? " · " + tr-cached : ""); color: Theme.muted; font-size: 12px; }
-                                            Text { text: current-secondary-available ? Math.round(current-secondary) + "%" : "—"; font-size: 26px; font-weight: 600; color: Theme.text; }
+                                            Text { text: tr-weekly-remaining + (acc.quota-stale ? " · " + tr-cached : ""); color: Theme.muted; font-size: 12px; }
+                                            Text { text: current-secondary-available ? Math.round(Math.max(0, Math.min(100, 100 - current-secondary))) + "%" : "—"; font-size: 26px; font-weight: 600; color: Theme.text; }
                                             Rectangle { height: 6px; border-radius: 3px; background: Theme.line;
-                                                Rectangle { x: 0px; y: 0px; width: parent.width * Math.min(1,Math.max(0,current-secondary / 100)); height: parent.height; border-radius: 3px; background: current-stale ? Theme.muted : Theme.copper; visible: current-secondary-available; }
+                                                Rectangle { x: 0px; y: 0px; width: parent.width * Math.min(1,Math.max(0,1 - current-secondary / 100)); height: parent.height; border-radius: 3px; background: acc.quota-stale ? Theme.muted : current-secondary >= 90 ? Theme.copper : Theme.ok; visible: current-secondary-available; }
                                             }
                                             Text { text: current-secondary-reset; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
                                         }
@@ -943,9 +1057,10 @@ export component MainWindow inherits Window {
                                         VerticalBox { spacing: 9px; horizontal-stretch: 1;
                                             Text { text: current-reset-credits; font-size: 12px; color: Theme.copper; wrap: word-wrap; }
                                             GhostButton { label: tr-reset-history; clicked => { account-row.history-open = !account-row.history-open; if account-row.history-open { root.load-reset-history(false); } } }
-                                            Text { text: "Credits  " + (current-credits == "" ? "—" : current-credits); color: Theme.muted; font-size: 12px; }
+                                            Text { text: tr-credits-balance + " " + current-credits; color: Theme.text; font-size: 12px; wrap: word-wrap; }
                                         }
                                     }
+                                    if provider-index == 0: Text { text: acc.quota-details; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
                                     if provider-index == 0: VerticalBox { spacing: 8px;
                                         Rectangle { height: 1px; background: Theme.line; }
                                         HorizontalBox { spacing: 24px;
@@ -992,176 +1107,108 @@ export component MainWindow inherits Window {
                         }
                     }
                     if page-index == 1 && provider-index == 0: VerticalBox {
-                        spacing: 20px;
+                        spacing: 16px;
+                        PageHeader {
+                            heading: "Codex · 分析";
+                            subtitle: analysis-local-mode ? "本机项目与聊天 · 与云端账号统计独立" : current-alias + " · " + current-plan;
+                            ComboBox { width: 90px; model: ["7 天", "30 天"]; current-index <=> root.analysis-range;
+                                selected(value) => { analysis-detail = ""; root.load-analysis(false); root.local-page = 0; root.render-local-analysis(); } }
+                            GhostButton { label: analysis-local-mode ? (local-busy ? "读取中" : "刷新本机") : (analysis-busy ? "读取中" : "刷新统计");
+                                enabled: analysis-local-mode ? !local-busy : !analysis-busy && current-alias != "";
+                                clicked => { if analysis-local-mode { root.load-local-analysis(); } else { root.load-analysis(true); root.refresh-usage(); } } }
+                        }
                         HorizontalBox { spacing: 10px;
-                            VerticalBox { spacing: 4px; horizontal-stretch: 1;
-                                Text { text: tr-nav-analysis; font-size: 25px; font-weight: 600; color: Theme.text; }
-                                Text { text: current-alias + " · " + current-plan + "  /  " + analysis-date-range; color: Theme.muted; font-size: 12px; overflow: elide; }
-                            }
-                            ComboBox { width: 90px; horizontal-stretch: 0; model: ["7 " + tr-days, "30 " + tr-days]; current-index <=> root.analysis-range; selected(value) => { root.load-analysis(false); } }
-                            GhostButton { label: analysis-busy ? tr-loading : tr-btn-refresh-usage; enabled: !analysis-busy && current-alias != ""; clicked => { root.load-analysis(true); root.refresh-usage(); } }
+                            GhostButton { label: "账号分析"; solid: !analysis-local-mode; clicked => { analysis-local-mode = false; } }
+                            GhostButton { label: "本机项目 / 聊天"; solid: analysis-local-mode; clicked => { analysis-local-mode = true; root.load-local-analysis(); } }
+                            Rectangle { horizontal-stretch: 1; }
+                            GhostButton { label: "导出 CSV"; clicked => { if analysis-local-mode { root.export-local-analysis(); } else { root.export-analysis(); } } }
                         }
-                        ComboBox {
-                            horizontal-stretch: 1;
-                            model: root.analysis-accounts;
-                            current-index: root.analysis-account-index;
+                        ComboBox { model: root.analysis-accounts; current-index <=> root.analysis-account-index;
                             enabled: root.accounts.length > 0;
-                            selected(value) => {
-                                if self.current-index >= 0 && self.current-index < root.accounts.length {
-                                    root.preview-account(root.accounts[self.current-index].alias);
-                                    root.load-analysis(false);
+                            selected(value) => { if self.current-index >= 0 && self.current-index < root.accounts.length {
+                                root.preview-account(root.accounts[self.current-index].alias); analysis-detail = ""; root.load-analysis(false); root.local-page = 0; root.render-local-analysis();
+                            } }
+                        }
+                        if !analysis-local-mode: VerticalBox { spacing: 16px;
+                            Text { text: "账号期间指标 · " + analysis-date-range; color: Theme.text; font-size: 13px; }
+                            if root.width >= 1000px: VerticalBox { spacing: 10px;
+                                HorizontalBox { spacing: 10px;
+                                    ActivityMetric { value: val-total; label: "已返回日期 Token · 账号总量"; }
+                                    ActivityMetric { value: analysis-turn-total; label: "已返回对话轮次 · 非完成任务数"; }
+                                }
+                                HorizontalBox { spacing: 10px;
+                                    ActivityMetric { value: analysis-consumption; label: "期间日消耗合计 · 非当前窗口额度"; }
+                                    ActivityMetric { value: analysis-dominant; label: "主要消耗模型 · 按已返回明细"; }
                                 }
                             }
-                        }
-                        Text { text: tr-token-title + " · " + current-alias; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
-                        if current-activity-error != "": Text { text: tr-cached + " · " + current-activity-error; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
-                        if current-token-lifetime == "": Rectangle {
-                            height: 100px;
-                            border-radius: 14px;
-                            background: Theme.panel;
-                            border-width: 1px;
-                            border-color: Theme.line;
-                            VerticalBox {
-                                alignment: center;
-                                spacing: 12px;
-                                Text {
-                                    text: tr-activity-no-data;
-                                    font-size: 13px;
-                                    color: Theme.muted;
-                                    horizontal-alignment: center;
-                                }
-                                HorizontalBox {
-                                    alignment: center;
-                                    GhostButton {
-                                        label: tr-btn-refresh-usage;
-                                        emphasis: true;
-                                        clicked => { refresh-usage(); }
-                                    }
-                                }
+                            if root.width < 1000px: VerticalBox { spacing: 10px;
+                                ActivityMetric { value: val-total; label: "已返回日期 Token · 账号总量"; }
+                                ActivityMetric { value: analysis-turn-total; label: "已返回对话轮次 · 非完成任务数"; }
+                                ActivityMetric { value: analysis-consumption; label: "期间日消耗合计 · 非当前窗口额度"; }
+                                ActivityMetric { value: analysis-dominant; label: "主要消耗模型 · 按已返回明细"; }
                             }
-                        }
-
-                        if current-token-lifetime != "": HorizontalBox {
-                            height: 72px;
-                            spacing: 8px;
-                            ActivityMetric { value: current-token-lifetime; label: tr-token-lifetime; }
-                            ActivityMetric { value: current-token-peak; label: tr-token-peak; }
-                            ActivityMetric { value: current-token-longest; label: tr-token-longest; }
-                            ActivityMetric { value: current-token-streak; label: tr-token-streak; }
-                            ActivityMetric { value: current-token-longest-streak; label: tr-activity-longest-streak; }
-                        }
-
-                        if current-token-lifetime != "": Rectangle {
-                            height: 190px;
-                            border-radius: 14px;
-                            background: Theme.panel;
-                            border-width: 1px;
-                            border-color: Theme.line.with-alpha(0.78);
-                            VerticalBox {
-                                padding: 14px;
-                                spacing: 10px;
-                                HorizontalBox {
-                                    height: 28px;
-                                    Text {
-                                        text: tr-activity-chart-title;
-                                        font-size: 11px;
-                                        font-family: "Menlo";
-                                        font-weight: 700;
-                                        letter-spacing: 1px;
-                                        color: Theme.text;
-                                        horizontal-stretch: 1;
-                                        vertical-alignment: center;
-                                    }
-                                    Text {
-                                        text: tr-activity-chart-hint;
-                                        font-size: 9px;
-                                        font-family: "Menlo";
-                                        color: Theme.faint;
-                                        vertical-alignment: center;
-                                    }
-                                    for tab[idx] in [tr-activity-daily, tr-activity-weekly, tr-activity-cumulative]: Rectangle {
-                                        width: 72px;
-                                        height: 28px;
-                                        border-radius: 7px;
-                                        background: activity-range == idx ? Theme.copper.with-alpha(0.16) : transparent;
-                                        border-width: activity-range == idx ? 1px : 0px;
-                                        border-color: Theme.copper.with-alpha(0.72);
-                                        accessible-role: button;
-                                        accessible-label: tab;
-                                        accessible-action-default => { activity-range = idx; }
-                                        TouchArea {
-                                            mouse-cursor: pointer;
-                                            clicked => { activity-range = idx; }
-                                        }
-                                        Text {
-                                            text: tab;
-                                            font-size: 10px;
-                                            font-weight: activity-range == idx ? 700 : 400;
-                                            color: activity-range == idx ? Theme.copper : Theme.muted;
-                                            horizontal-alignment: center;
-                                            vertical-alignment: center;
-                                        }
+                            Text { text: analysis-coverage; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
+                            Text { text: val-coverage; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                            if analysis-status != "": Text { text: analysis-status; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
+                            if analysis-action-status != "": Text { text: analysis-action-status; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
+                            GhostButton { label: analysis-show-status ? "收起数据来源与状态" : "查看数据来源与状态"; clicked => { analysis-show-status = !analysis-show-status; } }
+                            if analysis-show-status: PanelCard { VerticalBox { padding: 16px;
+                                Text { text: analysis-overview; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                            } }
+                            PanelCard { VerticalBox { padding: 18px; spacing: 12px;
+                                HorizontalBox { spacing: 10px;
+                                    Text { text: "每日趋势"; color: Theme.text; font-size: 17px; font-weight: 600; horizontal-stretch: 1; }
+                                    ComboBox { width: 180px; model: ["账号 Token", "筛选消耗", "API 情景折算"];
+                                        current-index <=> root.analysis-trend-mode; selected(value) => { val-chart-mode = self.current-index == 2 ? 1 : 0; root.update-analysis(); } }
+                                }
+                                Text { text: analysis-trend-mode == 1 ? "单位：" + analysis-unit + " · 使用下方消耗筛选" : "不适用模型、来源筛选 · UTC · 缺失日期显示 —"; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                                AnalysisChart { bars: analysis-trend-mode == 1 ? root.analysis-bars : root.val-bars; maximum: analysis-trend-mode == 1 ? root.analysis-max : root.val-max;
+                                    selected(detail) => { analysis-detail = detail; } }
+                                Text { text: "点击柱形查看数值，或展开下方逐日明细；今天可能未完整。"; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                                GhostButton { label: analysis-show-table ? "收起逐日明细" : "展开逐日明细"; clicked => { analysis-show-table = !analysis-show-table; } }
+                                if analysis-show-table: VerticalBox { spacing: 6px;
+                                    Text { text: "日期（UTC）        账号 Token        筛选消耗"; color: Theme.muted; font-size: 12px; }
+                                    for day in root.analysis-daily-rows: HorizontalBox { spacing: 10px;
+                                        GhostButton { label: day.date; clicked => { analysis-detail = day.detail; } }
+                                        Text { text: day.tokens; color: Theme.text; font-size: 11px; horizontal-stretch: 1; vertical-alignment: center; }
+                                        Text { text: day.usage; color: Theme.text; font-size: 11px; wrap: word-wrap; horizontal-stretch: 1; vertical-alignment: center; }
                                     }
                                 }
-
-                                activity-chart := Rectangle {
-                                    height: 116px;
-                                    background: Theme.bg.with-alpha(0.36);
-                                    border-radius: 10px;
-
-                                    if activity-range == 0: Rectangle {
-                                        x: 8px;
-                                        y: 8px;
-                                        width: parent.width - 16px;
-                                        height: 100px;
-                                        for value[idx] in root.current-token-daily: Rectangle {
-                                            x: Math.floor(idx / 7) * parent.width / 52;
-                                            y: Math.mod(idx, 7) * 14px;
-                                            width: max(2px, parent.width / 52 - 3px);
-                                            height: 10px;
-                                            border-radius: 3px;
-                                            background: value <= 0
-                                                ? Theme.line.with-alpha(0.36)
-                                                : Theme.copper.with-alpha(0.22 + value * 0.78);
-                                        }
-                                    }
-
-                                    if activity-range == 1: Rectangle {
-                                        x: 10px;
-                                        y: 8px;
-                                        width: parent.width - 20px;
-                                        height: 100px;
-                                        for value[idx] in root.current-token-weekly: Rectangle {
-                                            width: max(3px, parent.width / 52 - 4px);
-                                            x: idx * parent.width / 52 + 2px;
-                                            height: max(2px, value * 94px);
-                                            y: parent.height - self.height;
-                                            border-radius: 2px;
-                                            background: value > 0 ? Theme.copper : Theme.line.with-alpha(0.36);
-                                        }
-                                    }
-
-                                    if activity-range == 2: Rectangle {
-                                        x: 10px;
-                                        y: 8px;
-                                        width: parent.width - 20px;
-                                        height: 100px;
-                                        for value[idx] in root.current-token-cumulative: Rectangle {
-                                            width: max(3px, parent.width / 52 - 4px);
-                                            x: idx * parent.width / 52 + 2px;
-                                            height: max(2px, value * 94px);
-                                            y: parent.height - self.height;
-                                            border-radius: 2px;
-                                            background: value > 0 ? Theme.ok : Theme.line.with-alpha(0.36);
-                                        }
+                            } }
+                            PanelCard { VerticalBox { padding: 18px; spacing: 12px;
+                                Text { text: "消耗来源与模型"; color: Theme.text; font-size: 17px; font-weight: 600; }
+                                Text { text: "以下筛选只影响消耗趋势、排行与明细；不改变上方账号 Token、轮次、估值或本机聊天。"; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                                ComboBox { model: ["按产品", "按模型", "按消耗来源", "模型与速度"]; current-index <=> root.analysis-group;
+                                    selected(value) => { analysis-detail = ""; root.update-analysis(); } }
+                                HorizontalBox { spacing: 10px;
+                                    ComboBox { model: root.analysis-model-options; current-index <=> root.analysis-model-index;
+                                        selected(value) => { analysis-model-filter = value; analysis-detail = ""; root.update-analysis(); } }
+                                    ComboBox { enabled: root.analysis-group != 3; model: root.analysis-source-options; current-index <=> root.analysis-source-index;
+                                        selected(value) => { analysis-source-filter = value; analysis-detail = ""; root.update-analysis(); } }
+                                }
+                                Text { text: analysis-rank-note; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                                Text { text: analysis-usage-message; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                                if analysis-consumption-rows.length == 0: Text { text: "暂无可展示的正消耗。零值、缺失日期与未提供的维度请查看逐日明细。"; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
+                                for item in root.analysis-consumption-rows: VerticalBox { spacing: 4px;
+                                    GhostButton { label: item.name; horizontal-stretch: 1; clicked => { root.select-analysis-rank(item.name); } }
+                                    Text { text: item.value; color: Theme.text; font-size: 11px; }
+                                    Rectangle { height: 5px; background: Theme.line;
+                                        Rectangle { width: parent.width * item.ratio; height: parent.height; background: Theme.series(0); }
                                     }
                                 }
-                            }
-                        }
-
-                        if analysis-status != "": Text { text: analysis-status; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
-                        Rectangle {
-                            vertical-stretch: 0; background: Theme.panel; border-radius: 12px; border-width: 1px; border-color: Theme.line;
+                                GhostButton { label: analysis-show-all ? "仅显示前六项" : "展开全部分类"; clicked => { analysis-show-all = !analysis-show-all; root.update-analysis(); } }
+                            } }
+                            if analysis-detail != "": PanelCard { VerticalBox { padding: 18px; spacing: 10px;
+                                Text { text: "所选明细"; color: Theme.text; font-size: 15px; font-weight: 600; }
+                                Text { text: analysis-detail; color: Theme.text; font-size: 12px; wrap: word-wrap; }
+                                GhostButton { label: "关闭明细"; clicked => { analysis-detail = ""; } }
+                            } }
+                            GhostButton { label: analysis-show-comparison ? "收起完整期间对比" : "查看完整期间对比"; clicked => { analysis-show-comparison = !analysis-show-comparison; } }
+                            if analysis-show-comparison: PanelCard { VerticalBox { padding: 18px;
+                                Text { text: analysis-comparison; color: Theme.text; font-size: 12px; wrap: word-wrap; }
+                            } }
+                            GhostButton { label: analysis-show-valuation ? "收起 API 等价估值" : "查看 API 等价估值与价格依据"; clicked => { analysis-show-valuation = !analysis-show-valuation; } }
+                        if analysis-show-valuation: PanelCard {
                             VerticalBox { padding: 20px; spacing: 14px;
                                 Text { text: val-text.title; font-size: 16px; font-weight: 600; color: Theme.text; }
                                 HorizontalBox { spacing: 18px;
@@ -1191,6 +1238,11 @@ export component MainWindow inherits Window {
                                         Rectangle { height: 1px; background: Theme.line; }
                                     }
                                 }
+                                Text { text: "折算情景（手动选择，不代表实际计费档位）"; color: Theme.text; font-size: 12px; }
+                                HorizontalBox { spacing: 12px;
+                                    ComboBox { model: ["Standard", "Fast", "Ultrafast"]; current-index <=> root.val-speed-index; selected(value) => { root.change-price-scenario(); } }
+                                    ComboBox { model: ["短上下文 ≤272K", "长上下文 >272K"]; current-index <=> root.val-context-index; selected(value) => { root.change-price-scenario(); } }
+                                }
                                 Text { text: val-basis; font-size: 11px; color: Theme.muted; wrap: word-wrap; }
                                 HorizontalBox { spacing: 12px;
                                     Text { visible: !val-automatic; text: val-text.model; font-size: 12px; color: Theme.muted; vertical-alignment: center; }
@@ -1214,78 +1266,53 @@ export component MainWindow inherits Window {
                                 GhostButton { label: val-text.source + " ↗"; clicked => { root.open-pricing(); } }
                             }
                         }
-                        Rectangle {
-                            height: 240px; background: Theme.panel; border-radius: 12px; border-width: 1px; border-color: Theme.line;
-                            VerticalBox { padding: 20px; spacing: 10px;
-                                HorizontalBox {
-                                    Text { text: val-text.trend; font-size: 16px; font-weight: 600; color: Theme.text; horizontal-stretch: 1; vertical-alignment: center; }
-                                    ComboBox { width: 160px; model: [val-text.token-mode, val-text.cost-mode]; current-index <=> val-chart-mode; selected(value) => { root.update-analysis(); } }
+
+                            GhostButton { label: analysis-show-tools ? "收起轮次与工具榜单" : "查看轮次与工具榜单"; clicked => { analysis-show-tools = !analysis-show-tools; } }
+                            if analysis-show-tools: VerticalBox { spacing: 16px;
+                                RankingPanel { title: tr-product-activity; total: analysis-turn-total; subtitle: "账号期间轮次 · 不适用消耗筛选"; rows: analysis-activity-rows; message: analysis-activity-message; options: [tr-by-model, tr-by-client]; selection <=> root.analysis-activity-group; selected => { root.update-analysis(); } }
+                                RankingPanel { title: tr-tool-activity; total: analysis-tool-total; subtitle: "已返回榜单调用量 · 非全部调用审计"; rows: analysis-tool-rows; message: analysis-tool-message; options: [tr-plugins, tr-skills]; selection <=> root.analysis-tool-group; selected => { root.update-analysis(); } }
+                            }
+                            GhostButton { label: analysis-show-history ? "收起 52 周与累计记录" : "查看 52 周与累计记录"; clicked => { analysis-show-history = !analysis-show-history; root.update-analysis(); } }
+                            if analysis-show-history: VerticalBox { spacing: 12px;
+                                Text { text: "历史与累计 · 独立于上方 7 / 30 天范围"; color: Theme.text; font-size: 15px; font-weight: 600; }
+                                HorizontalBox { spacing: 8px;
+                                    ActivityMetric { value: current-token-lifetime; label: "累计 Token"; }
+                                    ActivityMetric { value: current-token-peak; label: "历史峰值日"; }
+                                    ActivityMetric { value: current-token-longest; label: "历史最长会话"; }
                                 }
-                                Rectangle { min-height: 120px; vertical-stretch: 1;
-                                    Text { text: val-max; color: Theme.muted; font-size: 10px; x: 0px; y: 0px; }
-                                    Text { text: "0"; color: Theme.muted; font-size: 10px; x: 0px; y: parent.height - 35px; }
-                                    HorizontalBox { padding-left: 80px; spacing: root.analysis-range == 0 ? 10px : 2px;
-                                        for bar in val-bars: Rectangle { horizontal-stretch: 1;
-                                            accessible-role: button; accessible-label: bar.detail;
-                                            accessible-action-default => { root.val-hover = bar.detail; }
-                                            if bar.segments.length == 0: Text { text: "—"; y: parent.height - 45px; width: parent.width; horizontal-alignment: center; color: Theme.muted; font-size: 11px; }
-                                            for segment in bar.segments: Rectangle { x: 0px; width: parent.width; y: 12px + (parent.height - 40px) * (1 - segment.fraction); height: (parent.height - 40px) * segment.fraction; background: Theme.series(0); }
-                                            Text { text: bar.label; y: parent.height - 22px; width: parent.width; horizontal-alignment: center; color: Theme.muted; font-size: 10px; }
-                                            TouchArea { mouse-cursor: pointer; changed has-hover => { if self.has-hover { root.val-hover = bar.detail; } } clicked => { root.val-hover = bar.detail; } }
+                                HorizontalBox { spacing: 8px;
+                                    ActivityMetric { value: current-token-streak; label: "当前连续使用"; }
+                                    ActivityMetric { value: current-token-longest-streak; label: "历史最长连续天数"; }
+                                }
+                                PanelCard { VerticalBox { padding: 16px; spacing: 10px;
+                                    Text { text: "过去 52 周 · 每日 Token · UTC"; color: Theme.text; font-size: 14px; }
+                                    Rectangle { height: 22px;
+                                        for month in root.analysis-heat-months: Text { text: month.label; x: month.column * parent.width / 52; color: Theme.muted; font-size: 9px; }
+                                    }
+                                    Rectangle { height: 110px;
+                                        for cell[index] in root.analysis-heat-cells: Rectangle {
+                                            x: Math.floor(index / 7) * parent.width / 52;
+                                            y: Math.mod(index,7) * 15px; width: max(3px,parent.width / 52 - 3px); height: 11px;
+                                            background: cell.intensity < 0 ? transparent : cell.intensity == 0 ? Theme.line : Theme.copper.with-alpha(0.25 + 0.75 * cell.intensity);
+                                            border-width: cell.intensity < 0 ? 1px : 0px; border-color: Theme.line;
+                                            accessible-role: button; accessible-label: cell.detail; accessible-action-default => { root.analysis-detail = cell.detail; }
+                                            TouchArea { mouse-cursor: pointer; clicked => { root.analysis-detail = cell.detail; } }
                                         }
                                     }
-                                }
-                                Text { text: val-hover; min-height: 16px; font-size: 11px; color: Theme.muted; overflow: elide; }
-                            }
-                        }
-                        Rectangle {
-                            height: 318px; background: Theme.panel; border-radius: 12px; border-width: 1px; border-color: Theme.line;
-                            VerticalBox { padding: 20px; spacing: 12px;
-                                HorizontalBox { spacing: 10px;
-                                    VerticalBox { spacing: 4px; horizontal-stretch: 1;
-                                        Text { text: tr-plan-usage; font-size: 16px; font-weight: 600; color: Theme.text; }
-                                        Text { text: analysis-unit; font-size: 11px; color: Theme.muted; }
+                                    Text { text: "空心：未提供  ·  灰色：明确为零  ·  橙色由浅到深：少 → 多。点击日期查看数值。"; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                                    if analysis-detail != "": Text { text: analysis-detail; color: Theme.text; font-size: 11px; wrap: word-wrap; }
+                                    HorizontalBox { spacing: 8px;
+                                        GhostButton { label: "每周"; solid: activity-range == 1; clicked => { activity-range = 1; } }
+                                        GhostButton { label: "累计"; solid: activity-range == 2; clicked => { activity-range = 2; } }
                                     }
-                                    ComboBox { width: 110px; horizontal-stretch: 0; model: [tr-by-product, tr-by-model]; current-index <=> root.analysis-group; selected(value) => { root.update-analysis(); } }
-                                }
-                                if analysis-usage-message != "": Text { text: analysis-usage-message; color: Theme.copper; font-size: 11px; wrap: word-wrap; }
-                                chart := Rectangle {
-                                    horizontal-stretch: 1; vertical-stretch: 1; min-height: 140px;
-                                    Text { text: analysis-max; color: Theme.muted; font-size: 10px; x: 0px; y: 0px; }
-                                    Rectangle { x: 36px; y: 12px; width: parent.width - 40px; height: 1px; background: Theme.line.with-alpha(0.55); }
-                                    Rectangle { x: 36px; y: (parent.height - 26px) / 2; width: parent.width - 40px; height: 1px; background: Theme.line.with-alpha(0.55); }
-                                    Text { text: "0"; x: 0px; y: parent.height - 38px; font-size: 10px; color: Theme.muted; }
-                                    HorizontalBox {
-                                        padding-left: 36px; spacing: root.analysis-range == 0 ? 10px : 2px;
-                                        for bar in root.analysis-bars: bar-cell := Rectangle {
-                                            horizontal-stretch: 1;
-                                            accessible-role: button; accessible-label: bar.detail;
-                                            accessible-action-default => { root.analysis-hover = bar.detail; }
-                                            for segment in bar.segments: Rectangle {
-                                                x: parent.width * 0.1; width: parent.width * 0.8;
-                                                y: 12px + (parent.height - 44px) * (1 - segment.offset - segment.fraction);
-                                                height: (parent.height - 44px) * segment.fraction;
-                                                background: Theme.series(segment.color-index);
-                                            }
-                                            Text { text: bar.label; y: parent.height - 24px; width: parent.width; horizontal-alignment: center; color: Theme.muted; font-size: 10px; }
-                                            TouchArea { mouse-cursor: pointer; changed has-hover => { if self.has-hover { root.analysis-hover = bar.detail; } } clicked => { root.analysis-hover = bar.detail; } }
+                                    Rectangle { height: 90px;
+                                        for value[index] in (activity-range == 2 ? root.current-token-cumulative : root.current-token-weekly): Rectangle {
+                                            x: index * parent.width / 52; width: max(3px,parent.width / 52 - 3px); height: max(1px,value * 85px); y: parent.height - self.height;
+                                            background: value > 0 ? Theme.ok : Theme.line;
                                         }
                                     }
-                                }
-                                HorizontalBox { spacing: 12px;
-                                    for series in root.analysis-legend: HorizontalBox { spacing: 4px;
-                                        Rectangle { width: 7px; height: 7px; border-radius: 4px; background: Theme.series(series.color-index); }
-                                        Text { text: series.name; font-size: 10px; color: Theme.muted; overflow: elide; }
-                                    }
-                                }
-                                Text { text: analysis-hover; color: Theme.muted; font-size: 11px; overflow: elide; min-height: 16px; }
-                            }
-                        }
-                        Text { text: tr-analysis-delay; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
-                        HorizontalBox { spacing: 18px;
-                            RankingPanel { title: tr-product-activity; total: analysis-turn-total; subtitle: tr-turns; rows: analysis-activity-rows; message: analysis-activity-message; options: [tr-by-model, tr-by-client]; selection <=> root.analysis-activity-group; selected => { root.update-analysis(); } }
-                            RankingPanel { title: tr-tool-activity; total: analysis-tool-total; subtitle: tr-returned-total; rows: analysis-tool-rows; message: analysis-tool-message; options: [tr-plugins, tr-skills]; selection <=> root.analysis-tool-group; selected => { root.update-analysis(); } }
-                        }
+                                    Text { text: "每周／累计为服务端历史记录概览；缺失周不推断为零。"; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                                } }
                         if current-token-lifetime != "": HorizontalBox {
                             height: 214px;
                             spacing: 12px;
@@ -1389,7 +1416,43 @@ export component MainWindow inherits Window {
                                 }
                             }
                         }
-                        Text { text: tr-analysis-source; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+
+                            }
+                        }
+                        if analysis-local-mode: VerticalBox { spacing: 16px;
+                            Text { text: "按更新时间筛选本机聊天；Token 为整段聊天累计值，不是期间消耗。与账号云端数据分开，不将聊天数量当作完成任务数。"; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
+                            HorizontalBox { spacing: 10px;
+                                ComboBox { model: ["全部本机记录", "创建账号匹配", "创建账号未知"]; current-index <=> root.local-scope;
+                                    selected(value) => { local-page = 0; root.render-local-analysis(); } }
+                                ComboBox { model: root.local-project-options; current-index <=> root.local-project-index;
+                                    selected(value) => { local-project-filter = value; local-page = 0; root.render-local-analysis(); } }
+                            }
+                            Field { text <=> root.local-search; placeholder: "搜索聊天标题、项目路径或最后记录模型"; edited => { local-page = 0; root.render-local-analysis(); } }
+                            Text { text: local-status; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                            if local-action-status != "": Text { text: local-action-status; color: Theme.copper; font-size: 12px; wrap: word-wrap; }
+                            PanelCard { VerticalBox { padding: 18px; spacing: 10px;
+                                ComboBox { model: ["按项目统计记录数", "按最后记录模型", "按手动用途标签"]; current-index <=> root.local-group; selected(value) => { root.render-local-analysis(); } }
+                                Text { text: local-summary; color: Theme.text; font-size: 12px; wrap: word-wrap; }
+                            } }
+                            for chat in root.local-rows: PanelCard { VerticalBox { padding: 14px; spacing: 7px;
+                                Text { text: chat.title; color: Theme.text; font-size: 14px; wrap: word-wrap; }
+                                Text { text: chat.detail; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                                HorizontalBox { spacing: 10px;
+                                    Text { text: "聊天累计 Token " + chat.tokens + " · 用途 " + chat.tag; color: Theme.text; font-size: 11px; wrap: word-wrap; horizontal-stretch: 1; }
+                                    GhostButton { label: "明细 / 标签"; clicked => { root.select-local-chat(chat.id); } }
+                                }
+                            } }
+                            HorizontalBox { spacing: 10px;
+                                GhostButton { label: "上一页"; enabled: local-page > 0; clicked => { local-page -= 1; root.render-local-analysis(); } }
+                                Text { text: (local-page + 1) + " / " + local-page-count; color: Theme.muted; font-size: 12px; vertical-alignment: center; }
+                                GhostButton { label: "下一页"; enabled: local-page + 1 < local-page-count; clicked => { local-page += 1; root.render-local-analysis(); } }
+                            }
+                            PanelCard { VerticalBox { padding: 18px; spacing: 10px;
+                                Text { text: local-detail; color: Theme.text; font-size: 12px; wrap: word-wrap; }
+                                if local-selected: Field { text <=> root.local-tag; placeholder: "手动用途标签（40 字以内，留空清除）"; }
+                                if local-selected: GhostButton { label: "保存手动标签"; clicked => { root.save-local-tag(); } }
+                            } }
+                        }
                     }
                 }
             }

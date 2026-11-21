@@ -19,6 +19,10 @@ pub struct UsageWindow {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct UsageSnapshot {
+    #[serde(default)]
+    pub quota: crate::quota::Status,
+    #[serde(default)]
+    pub reset_details: crate::quota::ResetDetails,
     pub alias: String,
     pub plan_type: String,
     pub primary: UsageWindow,
@@ -48,6 +52,8 @@ impl UsageSnapshot {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct TokenUsageProfile {
+    pub stats_as_of: Option<String>,
+    pub generated_at: Option<String>,
     pub lifetime_tokens: Option<i64>,
     pub peak_daily_tokens: Option<i64>,
     pub longest_running_turn_sec: Option<i64>,
@@ -198,8 +204,15 @@ pub fn fetch_usage(alias: &str, access_token: &str, account_id: &str) -> AppResu
         return Err(AppError::msg(friendly_http_error(status.as_u16(), &body)));
     }
 
-    let parsed: UsageResponse = serde_json::from_str(&body)?;
-    Ok(snapshot_from_response(alias, parsed))
+    parse_usage_payload(&body, alias)
+}
+
+// 同一份响应同时保留窗口摘要和完整额度详情，避免把未返回字段当成零。
+fn parse_usage_payload(body: &str, alias: &str) -> AppResult<UsageSnapshot> {
+    let parsed: UsageResponse = serde_json::from_str(body)?;
+    let mut snapshot = snapshot_from_response(alias, parsed);
+    snapshot.quota = serde_json::from_str(body)?;
+    Ok(snapshot)
 }
 
 pub fn http_client() -> AppResult<reqwest::blocking::Client> {
@@ -274,6 +287,7 @@ fn snapshot_from_response(alias: &str, parsed: UsageResponse) -> UsageSnapshot {
         last_attempted_at: fetched_at,
         activity_error: String::new(),
         error: String::new(),
+        ..Default::default()
     }
 }
 
@@ -287,7 +301,7 @@ fn window_from(w: Option<&WindowJson>, fetched_at: i64) -> UsageWindow {
             .map(|s| fetched_at + s)
     });
     UsageWindow {
-        used_percent: w.used_percent.unwrap_or(0.0),
+        used_percent: w.used_percent.unwrap_or(-1.0),
         reset_at,
         limit_window_seconds: w.limit_window_seconds,
     }
@@ -299,6 +313,13 @@ pub fn window_has_data(w: &UsageWindow) -> bool {
 
 pub fn window_is_expired(w: &UsageWindow, now: i64) -> bool {
     window_has_data(w) && w.reset_at.is_some_and(|reset_at| reset_at <= now)
+}
+
+pub fn window_usage_available(w: &UsageWindow, now: i64) -> bool {
+    window_has_data(w)
+        && w.used_percent.is_finite()
+        && w.used_percent >= 0.
+        && !window_is_expired(w, now)
 }
 
 pub fn snapshot_has_expired_window(snap: &UsageSnapshot, now: i64) -> bool {
@@ -356,7 +377,11 @@ pub fn format_usage_short(
     unavailable_label: &str,
     no_window_label: &str,
 ) -> String {
-    if !snap.error.is_empty() {
+    if !snap.error.is_empty()
+        || [&snap.primary, &snap.secondary]
+            .iter()
+            .any(|w| window_has_data(w) && (!w.used_percent.is_finite() || w.used_percent < 0.))
+    {
         return format!("{} · {unavailable_label}", snap.alias);
     }
     let plan = if snap.plan_type.is_empty() {
@@ -431,13 +456,39 @@ pub fn fetch_token_usage_profile(
         return Err(AppError::msg(friendly_http_error(status.as_u16(), &body)));
     }
 
-    let parsed: TokenUsageProfileResponse = serde_json::from_str(&body)?;
-    Ok(parsed.stats)
+    parse_token_profile(&body)
 }
 
-#[derive(Debug, Deserialize)]
-struct TokenUsageProfileResponse {
-    stats: TokenUsageProfile,
+fn parse_token_profile(body: &str) -> AppResult<TokenUsageProfile> {
+    let parsed: serde_json::Value = serde_json::from_str(body)?;
+    if parsed
+        .pointer("/metadata/stats_error")
+        .is_some_and(|v| !v.is_null())
+    {
+        return Err(AppError::msg("服务端活动统计尚不可用"));
+    }
+    if !parsed
+        .get("stats")
+        .and_then(|v| v.as_object())
+        .is_some_and(|s| s.contains_key("daily_usage_buckets") || s.contains_key("lifetime_tokens"))
+    {
+        return Err(AppError::msg("数据格式待适配：Token 活动缺少统计字段"));
+    }
+    let mut stats: TokenUsageProfile = serde_json::from_value(
+        parsed
+            .get("stats")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null),
+    )?;
+    stats.stats_as_of = parsed
+        .pointer("/metadata/stats_as_of")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    stats.generated_at = parsed
+        .pointer("/metadata/generated_at")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    Ok(stats)
 }
 
 /// Compact reset label for dense list rows.
@@ -461,6 +512,12 @@ pub fn format_usage_row(
         return (String::new(), true);
     }
     if snapshot_has_expired_window(snap, now) {
+        return (pending_label.into(), true);
+    }
+    if [&snap.primary, &snap.secondary]
+        .iter()
+        .any(|w| window_has_data(w) && (!w.used_percent.is_finite() || w.used_percent < 0.))
+    {
         return (pending_label.into(), true);
     }
 
@@ -629,8 +686,7 @@ fn truncate(s: &str, max: usize) -> String {
 
 #[cfg(test)]
 pub fn parse_usage_payload_for_test(body: &str, alias: &str) -> AppResult<UsageSnapshot> {
-    let parsed: UsageResponse = serde_json::from_str(body)?;
-    Ok(snapshot_from_response(alias, parsed))
+    parse_usage_payload(body, alias)
 }
 
 #[cfg(test)]
@@ -836,10 +892,10 @@ mod tests {
             "cumulative_daily_usage_buckets": [{"start_date":"2026-08-23","tokens":30}]
           }
         }"#;
-        let parsed: TokenUsageProfileResponse = serde_json::from_str(body).unwrap();
-        assert_eq!(parsed.stats.longest_streak_days, Some(100));
-        assert_eq!(parsed.stats.unique_skills_used, Some(86));
-        let invocation = &parsed.stats.top_invocations.unwrap()[0];
+        let parsed = parse_token_profile(body).unwrap();
+        assert_eq!(parsed.longest_streak_days, Some(100));
+        assert_eq!(parsed.unique_skills_used, Some(86));
+        let invocation = &parsed.top_invocations.unwrap()[0];
         assert_eq!(invocation.usage_count, 9238);
         assert_eq!(invocation.skill_id, None);
     }
@@ -883,5 +939,16 @@ mod tests {
         assert_eq!(values[0], 0.0);
         assert!((values[1] - 0.25).abs() < f32::EPSILON);
         assert_eq!(values[2], 1.0);
+    }
+    #[test]
+    fn token_profile_reports_freshness_and_rejects_unknown_shape() {
+        let p = parse_token_profile(r#"{"stats":{"daily_usage_buckets":[]},"metadata":{"stats_as_of":"2026-11-13","generated_at":"2026-11-14"}}"#).unwrap();
+        assert_eq!(p.stats_as_of.as_deref(), Some("2026-11-13"));
+        assert_eq!(p.generated_at.as_deref(), Some("2026-11-14"));
+        assert!(parse_token_profile(r#"{"stats":{}}"#).is_err());
+        assert!(parse_token_profile(
+            r#"{"stats":{"daily_usage_buckets":[]},"metadata":{"stats_error":"unavailable"}}"#
+        )
+        .is_err());
     }
 }

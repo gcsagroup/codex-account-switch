@@ -259,7 +259,10 @@ pub fn render_locked(w: &MainWindow, state: &AppShared) {
                     .into(),
             })
             .collect();
-        if rows.is_empty() {
+        if rows.is_empty() && !busy && !h.errors.contains_key(account) {
+            if !status.is_empty() {
+                status.push_str(" · ");
+            }
             status.push_str(t(lang, "history.empty"));
         }
         w.set_reset_history_rows(ModelRc::new(VecModel::from(rows)));
@@ -278,6 +281,45 @@ pub fn render_locked(w: &MainWindow, state: &AppShared) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn history_response_uses_event_contract_and_follows_pages() {
+        let mut requests = 0;
+        let history = collect_pages(|cursor| {
+            requests += 1;
+            let body = match cursor {
+                None => r#"{"events":[{"id":"first","kind":"granted","occurred_at":"2026-11-12T22:41:12.783754Z"}],"window_start":"2026-10-22T07:22:41Z","as_of":"2026-11-21T07:22:41Z","next_cursor":"second"}"#,
+                Some("second") => r#"{"events":[{"id":"second","kind":"redeemed","occurred_at":"2026-11-15T00:00:00Z"}],"window_start":"2026-10-22T07:22:41Z","as_of":"2026-11-21T07:22:41Z","next_cursor":null}"#,
+                _ => panic!("出现意外游标"),
+            };
+            crate::analytics::parse_response("rate-limit-reset-credits/history", body)
+        }).unwrap();
+        assert_eq!(requests, 2);
+        assert_eq!(history.events.len(), 2);
+        assert_eq!(history.events[0].kind, "redeemed");
+        assert_eq!(history.events[1].kind, "granted");
+    }
+
+    #[test]
+    fn history_still_rejects_missing_fields_and_invalid_dates() {
+        for body in [
+            r#"{"data":[]}"#,
+            r#"{"events":[],"window_start":"invalid","as_of":"2026-11-21T00:00:00Z"}"#,
+            r#"{"events":[{"id":"a","kind":"granted"}],"window_start":"2026-10-22T00:00:00Z","as_of":"2026-11-21T00:00:00Z"}"#,
+        ] {
+            assert!(crate::analytics::parse_response::<Page>(
+                "rate-limit-reset-credits/history",
+                body
+            )
+            .is_err());
+        }
+        // 修复历史入口不能放宽日统计的契约。
+        assert!(crate::analytics::parse_response::<serde_json::Value>(
+            "usage/daily-token-usage-breakdown",
+            r#"{"events":[]}"#
+        )
+        .is_err());
+    }
     fn page(events: serde_json::Value, cursor: Option<&str>) -> Page {
         serde_json::from_value(serde_json::json!({"events":events,"window_start":"2026-08-17T00:00:00Z","as_of":"2026-09-16T00:00:00Z","next_cursor":cursor})).unwrap()
     }

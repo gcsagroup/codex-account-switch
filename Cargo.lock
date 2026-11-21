@@ -884,7 +884,7 @@ dependencies = [
 
 [[package]]
 name = "codex-account-switch"
-version = "1.4.1"
+version = "3.0.0"
 dependencies = [
  "arboard",
  "base64",

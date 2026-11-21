@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.0.0 — 2026-11-21
+
+- Show weekly remaining quota and rounded credit balance directly in account cards. Distinguish owned resets from resets usable now; include expiry dates, estimated messages and model/limit status.
+- Fix reset-history response validation while retaining pagination and error handling. Missing usage percentages no longer appear as 100% remaining.
+
+- Lead with selected-period metrics and separate Token, turn and consumption coverage; distinguish missing values, explicit zero, unsupported dimensions and stale results.
+- Add daily trends, category rankings, daily detail, complete-period comparisons and CSV exports with scope, units and pricing assumptions. Persist consumption filters per account.
+- Update verified model prices and add speed/context scenarios; distinguish classified usage, turn-based allocation and unpriced usage. Estimates are not bills.
+- Add read-only local project/chat analysis, unknown-creator filtering and manual purpose tags. Cumulative chat tokens are neither period consumption nor cloud account totals.
+- Keep the existing macOS installation path and local signing. This candidate is not notarized, publicly released or verified on native Windows.
+
 [English](CHANGELOG.md) | [简体中文](CHANGELOG.zh-CN.md) | [繁體中文](CHANGELOG.zh-TW.md)
 
 This log records source changes and local verification; a Git tag does not imply a published GitHub Release.

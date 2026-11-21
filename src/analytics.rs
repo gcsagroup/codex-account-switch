@@ -2,7 +2,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{Days, NaiveDate, Utc};
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
 
@@ -34,34 +34,50 @@ pub struct Snapshot {
     pub skills: Panel<ToolResponse>,
     pub tokens: Panel<crate::usage::TokenUsageProfile>,
     pub detailed_tokens: Panel<crate::model_valuation::DetailedUsage>,
+    pub comparison_recent: Panel<UsageResponse>,
+    pub comparison_previous: Panel<UsageResponse>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UsageResponse {
     pub data: Vec<UsageDay>,
     pub units: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageDay {
     pub date: NaiveDate,
     pub product_surface_usage_values: BTreeMap<String, f64>,
     #[serde(default)]
     pub models: Vec<ModelUsage>,
+    #[serde(default)]
+    pub attribution: Vec<Attribution>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelUsage {
     pub model: String,
     pub credits: f64,
+    #[serde(default)]
+    pub speed: String,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Attribution {
+    pub thread_source: String,
+    pub turn_trigger: String,
+    pub model: String,
+    pub surface: String,
+    pub value: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ActivityResponse {
     pub data: Vec<ActivityDay>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActivityDay {
     pub date: NaiveDate,
     pub totals: TurnCount,
@@ -71,38 +87,38 @@ pub struct ActivityDay {
     pub clients: Vec<ClientTurns>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TurnCount {
     pub turns: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelTurns {
     pub model: String,
     pub turns: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientTurns {
     pub client_id: String,
     pub turns: u64,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ToolResponse {
     pub data: Vec<ToolDay>,
     #[serde(default)]
     pub data_freshness_ts: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolDay {
     pub date: NaiveDate,
     #[serde(alias = "skill_usage_overviews")]
     pub plugin_usage_overviews: Vec<ToolCount>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCount {
     #[serde(default)]
     pub display_name: String,
@@ -118,6 +134,10 @@ pub struct Series {
 }
 
 pub fn dates(end: NaiveDate, days: i32) -> Vec<NaiveDate> {
+    dates_for_period(end, days)
+}
+
+fn dates_for_period(end: NaiveDate, days: i32) -> Vec<NaiveDate> {
     (0..days.clamp(1, 30))
         .rev()
         .filter_map(|offset| end.checked_sub_days(Days::new(offset as u64)))
@@ -140,12 +160,15 @@ pub fn fetch(
             previous.plugins.error = message.clone();
             previous.skills.error = message.clone();
             previous.tokens.error = message.clone();
-            previous.detailed_tokens.error = message;
+            previous.detailed_tokens.error = message.clone();
+            previous.comparison_recent.error = message.clone();
+            previous.comparison_previous.error = message;
             return previous;
         }
     };
     let dates = dates(end, days);
     let start = dates[0].to_string();
+    let comparison_end = end.pred_opt().unwrap_or(end);
     let end = end.to_string();
     let base = [
         ("start_date", start.as_str()),
@@ -154,6 +177,28 @@ pub fn fetch(
     ];
     // 分别读取，某个面板失败不影响其余面板；只在后台线程等待。
     std::thread::scope(|scope| {
+        let comparison = scope.spawn(|| {
+            let read_period = |end: NaiveDate| {
+                let ds = dates_for_period(end, days);
+                let start = ds[0].to_string();
+                let end = end.to_string();
+                get(
+                    &client,
+                    token,
+                    account,
+                    "usage/daily-token-usage-breakdown",
+                    &[
+                        ("start_date", start.as_str()),
+                        ("end_date", end.as_str()),
+                        ("group_by", "day"),
+                    ],
+                )
+            };
+            (
+                read_period(comparison_end),
+                read_period(comparison_end - chrono::Duration::days(days.into())),
+            )
+        });
         let detailed = scope.spawn(|| {
             let mut query = base.to_vec();
             query.extend([
@@ -212,6 +257,14 @@ pub fn fetch(
                 &query,
             )
         });
+        let (recent, prior) = comparison.join().unwrap_or_else(|_| {
+            (
+                Err(AppError::msg("期间对比请求中断")),
+                Err(AppError::msg("期间对比请求中断")),
+            )
+        });
+        previous.comparison_recent.update(recent);
+        previous.comparison_previous.update(prior);
         previous.detailed_tokens.update(
             detailed
                 .join()
@@ -270,10 +323,24 @@ pub(crate) fn get<T: DeserializeOwned>(
             &body,
         )));
     }
-    serde_json::from_str(&body).map_err(|_| AppError::msg("分析数据格式已变化，请稍后重试"))
+    parse_response(endpoint, &body)
+}
+
+// 日统计按日期校验；重置历史使用事件结构，分页和时间范围由历史模块校验。
+pub(crate) fn parse_response<T: DeserializeOwned>(endpoint: &str, body: &str) -> AppResult<T> {
+    let value: serde_json::Value = serde_json::from_str(body)
+        .map_err(|_| AppError::msg("数据格式待适配：响应不是有效 JSON"))?;
+    if endpoint != "rate-limit-reset-credits/history" {
+        crate::analysis_report::validate_response(endpoint, &value).map_err(AppError::msg)?;
+    }
+    serde_json::from_value(value)
+        .map_err(|_| AppError::msg("数据格式待适配：统计字段或单位无法识别"))
 }
 
 pub fn usage_series(data: &UsageResponse, dates: &[NaiveDate], by_model: bool) -> Vec<Series> {
+    compact_series(usage_series_full(data, dates, by_model), dates.len())
+}
+fn usage_series_full(data: &UsageResponse, dates: &[NaiveDate], by_model: bool) -> Vec<Series> {
     let mut values: BTreeMap<String, Vec<f64>> = BTreeMap::new();
     for day in &data.data {
         let Some(index) = dates.iter().position(|date| *date == day.date) else {
@@ -315,9 +382,13 @@ pub fn usage_series(data: &UsageResponse, dates: &[NaiveDate], by_model: bool) -
             .total_cmp(&sum(&a.values))
             .then(a.name.cmp(&b.name))
     });
+    series
+}
+
+fn compact_series(mut series: Vec<Series>, days: usize) -> Vec<Series> {
     // 颜色保持唯一，长尾模型聚合后仍保留每日总量。
     if series.len() > 6 {
-        let mut other = vec![0.0; dates.len()];
+        let mut other = vec![0.0; days];
         for tail in series.drain(5..) {
             for (index, value) in tail.values.iter().enumerate() {
                 other[index] += value;
@@ -329,6 +400,144 @@ pub fn usage_series(data: &UsageResponse, dates: &[NaiveDate], by_model: bool) -
         });
     }
     series
+}
+
+/// 分组 0 产品、1 模型、2 来源、3 模型与速度。未知来源保留原名。
+pub fn grouped_usage(
+    data: &UsageResponse,
+    dates: &[NaiveDate],
+    group: i32,
+    model: &str,
+    source: &str,
+) -> Vec<Series> {
+    if group < 2 && model.is_empty() && source.is_empty() {
+        return usage_series(data, dates, group == 1);
+    }
+    compact_series(
+        grouped_usage_full(data, dates, group, model, source),
+        dates.len(),
+    )
+}
+pub fn grouped_usage_full(
+    data: &UsageResponse,
+    dates: &[NaiveDate],
+    group: i32,
+    model: &str,
+    source: &str,
+) -> Vec<Series> {
+    if group < 2 && model.is_empty() && source.is_empty() {
+        return usage_series_full(data, dates, group == 1);
+    }
+    let mut copy = data.clone();
+    for day in &mut copy.data {
+        if group == 3 || (group == 1 && source.is_empty()) {
+            day.models.retain(|m| model.is_empty() || m.model == model);
+            for m in &mut day.models {
+                if group != 3 {
+                    continue;
+                }
+                m.model = format!(
+                    "{} · {}",
+                    m.model,
+                    if m.speed.is_empty() {
+                        "未知速度"
+                    } else {
+                        &m.speed
+                    }
+                );
+            }
+        } else {
+            day.models = day
+                .attribution
+                .iter()
+                .filter(|a| {
+                    (model.is_empty() || a.model == model)
+                        && (source.is_empty() || source_key(a) == source)
+                })
+                .map(|a| ModelUsage {
+                    model: match group {
+                        0 => a.surface.clone(),
+                        1 => a.model.clone(),
+                        _ => source_key(a),
+                    },
+                    speed: String::new(),
+                    credits: a.value,
+                })
+                .collect();
+        }
+    }
+    usage_series_full(&copy, dates, true)
+}
+pub fn source_key(a: &Attribution) -> String {
+    let raw = format!(
+        "{} / {}",
+        if a.thread_source.is_empty() {
+            "未知来源"
+        } else {
+            &a.thread_source
+        },
+        if a.turn_trigger.is_empty() {
+            "未知触发"
+        } else {
+            &a.turn_trigger
+        }
+    );
+    let label = match a.turn_trigger.as_str() {
+        "composer" => "手动对话",
+        "automation_heartbeat_scheduled" => "定时任务",
+        "app_update_resume" => "更新后恢复",
+        "automaticretry" | "automatic_retry" | "capacity_retry_automatic" => "自动重试",
+        _ => match a.thread_source.as_str() {
+            "computer_history" => "电脑历史",
+            "memory_consolidation" => "记忆整理",
+            "suggestions" | "ambient_suggestions" => "建议生成",
+            "ambient_suggestion_safety" => "建议安全检查",
+            "thread_title" => "会话标题",
+            _ => return raw,
+        },
+    };
+    format!("{label}（{raw}）")
+}
+pub fn composition(
+    data: &UsageResponse,
+    dates: &[NaiveDate],
+    group: i32,
+    model: &str,
+    source: &str,
+) -> String {
+    let series = grouped_usage(data, dates, group, model, source);
+    let total: f64 = series.iter().map(|s| s.values.iter().sum::<f64>()).sum();
+    let coverage = dates
+        .iter()
+        .filter(|d| data.data.iter().any(|day| day.date == **d))
+        .count();
+    let attributed = data
+        .data
+        .iter()
+        .filter(|d| dates.contains(&d.date))
+        .any(|d| !d.attribution.is_empty());
+    let mut lines = vec![format!("返回日期 {coverage}/{} · 单位 {}。比例表示筛选范围内的消耗构成，不等于本周已用额度或费用；今天的数据可能仍未汇总。", dates.len(), data.units)];
+    if group == 3 {
+        lines.push("速度数据来自独立的模型统计，来源筛选仅用于其他分组。".into());
+    }
+    if !attributed && (group == 2 || !source.is_empty() || (!model.is_empty() && group == 0)) {
+        lines.push("接口未提供消耗来源明细，不能将缺失值视为零。".into());
+    }
+    if total > 0. {
+        lines.extend(series.iter().map(|s| {
+            let n = s.values.iter().sum::<f64>();
+            format!(
+                "{}：{:.2}% · {:.4} {}",
+                if s.name == "Other" { "其他" } else { &s.name },
+                n / total * 100.,
+                n,
+                data.units
+            )
+        }));
+    } else {
+        lines.push("当前筛选没有已返回的正用量；缺失数据不代表零消耗。".into());
+    }
+    lines.join("\n")
 }
 
 pub fn activity_ranking(
@@ -462,10 +671,12 @@ mod tests {
             data: vec![UsageDay {
                 date: dates[29],
                 product_surface_usage_values: BTreeMap::new(),
+                attribution: vec![],
                 models: (0..10)
                     .map(|i| ModelUsage {
                         model: format!("m{i}"),
                         credits: 1.,
+                        speed: String::new(),
                     })
                     .collect(),
             }],
@@ -473,5 +684,32 @@ mod tests {
         let series = usage_series(&data, &dates, true);
         assert_eq!(series.len(), 6);
         assert_eq!(series.iter().map(|s| s.values[29]).sum::<f64>(), 10.);
+    }
+    #[test]
+    fn attribution_and_speed_preserve_totals_and_unknown_labels() {
+        let data: UsageResponse = serde_json::from_str(r#"{"units":"percent","data":[{"date":"2026-10-10","product_surface_usage_values":{"codex":4},"models":[{"model":"x","speed":"standard","credits":1},{"model":"x","speed":"fast","credits":3}],"attribution":[{"thread_source":"user","turn_trigger":"composer","model":"x","value":1},{"thread_source":"future","turn_trigger":"new","model":"x","value":3}]}]}"#).unwrap();
+        let ds = dates(NaiveDate::from_ymd_opt(2026, 10, 10).unwrap(), 7);
+        for group in [0, 1, 2, 3] {
+            assert_eq!(
+                grouped_usage(&data, &ds, group, "", "")
+                    .iter()
+                    .map(|s| s.values.iter().sum::<f64>())
+                    .sum::<f64>(),
+                4.
+            );
+        }
+        assert_eq!(
+            grouped_usage(&data, &ds, 2, "x", "手动对话（user / composer）")[0].values[6],
+            1.
+        );
+        assert!(composition(&data, &ds, 2, "", "").contains("future / new：75.00%"));
+        assert!(composition(&data, &ds, 3, "", "").contains("x · fast"));
+    }
+    #[test]
+    fn model_filter_works_without_attribution_and_speed_does_not_invent_source() {
+        let data: UsageResponse = serde_json::from_str(r#"{"units":"percent","data":[{"date":"2026-10-10","product_surface_usage_values":{},"models":[{"model":"x","credits":4}]}]}"#).unwrap();
+        let ds = dates(NaiveDate::from_ymd_opt(2026, 10, 10).unwrap(), 7);
+        assert_eq!(grouped_usage(&data, &ds, 1, "x", "")[0].values[6], 4.);
+        assert!(composition(&data, &ds, 2, "", "").contains("接口未提供"));
     }
 }
