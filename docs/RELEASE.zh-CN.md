@@ -42,7 +42,7 @@ macOS 13+、Apple 芯片（arm64），构建号 19。包使用 Apple Distributio
 - 固定 Rust 工具链：`1.97.1`（`rust-toolchain.toml`）
 - 最低 Rust 版本：`1.92`（`Cargo.toml`）
 - UI 框架：Slint `1.17`
-- CI 运行环境：`macos-14` 和 `windows-2025`
+- CI 运行环境：`macos-15` 和 `windows-2025`
 
 请使用仓库固定的工具链，不要使用更旧的系统 Rust。
 

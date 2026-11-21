@@ -38,7 +38,7 @@ The dedicated workflow verifies main ancestry, the tag, successful CI, downloade
 - Pinned Rust toolchain: `1.97.1` (`rust-toolchain.toml`)
 - Minimum Rust version: `1.92` (`Cargo.toml`)
 - UI framework: Slint `1.17`
-- CI runners: `macos-14` and `windows-2025`
+- CI runners: `macos-15` and `windows-2025`
 
 Use the repository toolchain rather than an older system Rust installation.
 

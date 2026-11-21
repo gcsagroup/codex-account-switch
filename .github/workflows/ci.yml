@@ -28,7 +28,7 @@ jobs:
 
   macos:
     needs: prepare
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       CI_BUILD_NUMBER: ${{ needs.prepare.outputs.build }}
       RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
